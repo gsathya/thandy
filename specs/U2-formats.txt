@@ -1,0 +1,430 @@
+
+
+Scope
+
+   This document descibes a repository and document format for use in
+   distributing Tor bundle updates.  It is meant to be a component of
+   an overall automatic update system.
+
+   Not described in this document is the design the packages or their
+   install process, though some requirements are listed.
+
+Proposed code name
+
+   Since "auto-update" is so generic, I've been thinking about going with
+   with "hapoc" or "glider" or "petaurus", all based on the sugar
+   glider you get when you search for "handy pocket creature".
+
+Metaformat
+
+   All documents use Rivest's SEXP meta-format as documented at
+     http://people.csail.mit.edu/rivest/sexp.html
+   with the restriction that no "display hint" fields are to be used,
+   and the base64 transit encoding isn't used either.
+
+   In descriptions of syntax below, we use regex-style qualifiers, so
+   that in
+        (sofa slipcover? occupant* leg+)
+   the sofa will have an optional slipcover, zero or more occupants,
+   and one or more legs.  This pattern matches (sofa leg) and (sofa
+   slipcover occupant occupant leg leg leg leg) but not (sofa leg
+   slipcover).
+
+   We also use a braces notation to indicate elements that can occur
+   in any order.  For example,
+        (bread {flour+ eggs? yeast})
+   matches a list starting with "bread", and then containing a one or
+   more occurances of flours, zero or one occurances of eggs, and one
+   occurance of yeast, in any order.  This pattern matches (bread eggs
+   yeast flour) but not (bread yeast) or (bread flour eggs yeast
+   macadamias).
+
+
+Goals
+
+   It should be possible to mirror a repository using only rsync and cron.
+
+   Separate keys should be used for different people and different
+   roles.
+
+   Only a minimal set of keys should have to be kept online to keep
+   the system running.
+
+   The system should handle any single computer or system or person
+   being unavailable.
+
+   The system should be pretty future-proof.
+
+   The client-side of the architecture should be really easy to implement.
+
+Non-goals:
+
+   This is not a package format.  Instead, we reuse existing package
+   formats for each platform.
+
+   This is not a general-purpose package manager like yum or apt: it
+   assumes that users will want to have one or more of a set of
+   "bundles", not an arbitary selection of packages dependant on one
+   another.
+
+   This is also not a general-purpose package format.  It assumes the
+   existance of an external package format that can handle install,
+   update, remove, and version query.
+
+Architecture: Repository
+
+   A "repository" is a directory hierarchy containing packages,
+   bundles, and metadata, all signed.
+
+   A "package" is a single independent downloadable, installable
+   binary archive.  It could be an MSI, an RPM, a DMG, or so on.
+   Every package is compiled version of some version of some piece of
+   software (an 'application') for some (os, architecture,
+   version) combinations.  Some packages are "glue" that make other
+   packages work well together or get configured properly.
+
+   A "bundle" is a list of of packages to be installed together.
+   Examples might be "Tor Browser Bundle" or "Tor plus controller".  A
+   bundle is versioned, and every bundle is for a particular (os,
+   architecture) combination.  Bundles specify which order to install
+   or update their components.
+
+   Metadata is used to:
+     - Find mirrors
+     - Validate packages, bundles, and metadata
+     - Make sure information is up-to-date
+     - Determine which packages are in a bundle
+
+   The filesystem layout in the repository is used for two purposes:
+     - To give mirrors an easy way to mirror only some of the repository.
+     - To specify which parts of the repository a given key has the
+       authority to sign.
+
+Architecture: Roles
+
+   Every role in the system are associated with a key.  Replacing
+   anything but a root key is supposed to be relatively easy.
+
+   Root-keys sign other keys, and certify them as belonging to roles.
+   Clients are configured to know the root keys.
+
+   Bundle keys certify the contents of a bundle.
+
+   Package keys certify packages for a given program or set of
+   programs.
+
+   Mirror keys certify a list of mirrors.  We expect this to be an
+   automated process.
+
+   Timestamp keys certify that given versions of other metadata
+   documents are up-to-date.  They are the only keys that absolutely
+   need to be kept online.  (If they are not, timestamps won't be
+   generated.)
+
+Directory layout
+
+   The following files exist in all repositories and mirrors:
+
+    /meta/keys.txt
+
+         Signed by the root keys; indicates keys and roles.
+         [XXXX I'm using the txt extension here.  Is that smart?]
+
+    /meta/mirrors.txt
+
+         Signed by the mirror key; indicates which parts of the repo
+         are mirrored where.
+
+    /meta/timestamp.txt
+
+         Signed by the timestamp key; indicates hashes and timestamps
+         for the latest versions of keys.txt and mirrors.txt.  Also
+         indicates the latest version of each bundle for each os/arch.
+
+    /bundleinfo/bundlename/os-arch/bundlename-os-arch-bundleversion.txt
+
+         Signed by the appropriate bundle key.  Describes what
+         packages make up a bundle, and what order to install,
+         uninstall, and upgrade them in.
+
+    /pkginfo/packagename/os-arch/version/packagename-os-arch-packageversion.txt
+
+         Signed by the appropriate package key.  Tells the name of the
+         file that makes up the bundle, its hash, and what procedure
+         is used to install it.
+
+    /packages/packagename/os-arch/version/(some filename)
+
+         The actual files 
+
+File formats: general principles
+
+   We use tagged lists (lists whose first element is a string) to
+   indicate typed objects.  Tags are generally lower-case, with
+   hyphens used for separation.  Think Lispy.
+
+   We use attrlists [lists of (key value) lists] to indicate a
+   multimap from keys to values.  Clients MUST accept unrecognized
+   keys in these attrlists.  The syntax for an attrlist with two
+   recognized and required keys is typically given as ({(key1 val1)
+   (key2 val2) (ATTR VAL)*}), indicating that the keys can occur in
+   any order, intermixed with other attributes.
+
+   Timestamp files will be downloaded very frequently; all other files
+   will be much smaller in size than package files.  Thus,
+   size-optimization for timestamp files makes sense and most other
+   other space optimizations don't.
+
+   Versions are represented as lists of the form (v I1 I2 I3 I4 ...)
+   where each item is a number or alphanumeric version component.  For
+   example, the version "0.2.1.5-alpha" is represented as (v 0 2 1 5
+   alpha).
+
+   All signed files are of the format:
+
+       (signed
+          X
+          (signature ({(keyid K) (method M) (ATTR VAL)*}) SIG)+
+       )
+
+   where: X is a list whose fist element describes the signed object.
+          K is the identifier of a key signing the document
+          M is the method to be used to make the signature
+          (ATTR VAL) is an arbitrary list whose first element is a
+             string.
+          SIG is a signature of the canonical encoding of X using the
+          identified key.
+
+   We define two signing methods at present:
+       sha256-oaep : A signature of the SHA256 hash of the canonical
+         encoding of X, using OAEP+ padding. [XXXX say more about mgf]
+
+   All times are given as strings of the format "YYYY-MM-DD HH:MM:SS",
+   in UTC.
+
+   All keys are of the format:
+      (pubkey ({(type TYPE) (ATTR VAL)*}) KEYVAL)
+   where TYPE is a string describing the type of the key and how it's
+   used to sign documents.  The type determines the interpretation of
+   KEYVAL.
+
+   The ID of a key is the type field concatenated with the SHA-256
+   hash of the canonical encoding of the KEYVAL field.
+
+   We define one keytype at present: 'rsa'.  The KEYVAL in this case is a
+   2-element list of (e p), with both values given in big-endian
+   binary format.  [This makes keys 45-60% more compact.]
+
+File formats: key list
+
+   (keylist
+     (ts TIME)
+     (keys
+       ((key ({(roles (ROLE PATH)+) (ATTR VAL)*}) KEY)*)
+     ...
+   )
+
+   The "ts" line describes when the keys file was updated.  Clients
+   MUST NOT replace a file with an older one, and SHOULD NOT accept a
+   file too far in the future.
+
+   A ROLE is one of "timestamp" "mirrors" "bundle" or "package"
+
+   PATH is a path relative to the top of the directory hierarchy.  It
+   may contain "*" elements to indicate "any file", and may end with a
+   "/**" element to indicate all files under a given point.
+
+File formats: mirror list
+
+   (mirrorlist
+     (ts TIME)
+     (mirrors
+       ( (mirror ({(name N) (urlbase U) (contents PATH+) (ATTR VAL)})) * )
+     ...
+  )
+
+  Every mirror is a copy of some or all of the directory hierarchy
+  containing at least the /meta, /bundles/, and /pkginfo directories.
+
+  N is a descriptive name for the mirror; U is the URL of the mirror's
+  base (i.e., the parent of the "meta" directory); and the PATH
+  elements are the components describing how much of the packages
+  directory is mirrored.  Their format is as in the keylist file.
+
+File formats: timestamp files
+  (ts
+    ({(at TIME)
+      (m TIME MIRRORLISTHASH)
+      (k TIME KEYLISTHASH)
+      (b NAME VERSION TIME PATH HASH)*})
+  )
+
+  TIME is when the timestamp was signed.  MIRRORLISTHASH is the digest
+  of the mirror-list file; KEYLISTHASH is the digest of the key list
+  file; and the 'b' entries are a list of the latest version of each
+  bundles and their locations and hashes.
+
+File formats: bundle files
+
+  (bundle
+    (at TIME)
+    (os OS)
+    [(arch ARCH)]
+    (version V)
+    (packages
+      (NAME VERSION PATH HASH ({(order INST UPDATE REMOVE)
+                                (optional)?
+                                (gloss LANG TEXT)*
+                                (longloss LANG TEXT)*
+                                 (ATTR VAL)*})? )* )
+  )
+
+  Most elements are self-explanatory; the INST, UPDATE, and REMOVE
+  elements of the order element are numbers defining the order in
+  which the packages are installed, updated, and removed respectively.
+  The "optional" element is present if the package is optional.
+  "Gloss" is an short utf-8 human-readable string explaining what the
+  package provides for the bundle; "longloss" is a longer such
+  utf-8 string.
+
+  (Note that the gloss strings are meant, not to describe the package,
+  but to describe what the package provides for the bundle.  For
+  example, "The Anonymous Email Bundle needs the Python Runtime to run
+  Mixminion.")
+
+File formats: package files
+  (package
+    ({(name NAME)
+     (version VERSION)
+     (format FMT ((ATTR VAL)*)? )
+     (path PATH)
+     (ts TIME)
+     (digest HASH)
+     (shortdesc LANG TEXT)*
+     (longdesc LANG TEXT)*
+     (ATTR VAL)* })
+  )
+
+  Most elements are self-explanatory.  The "FMT" element describes the
+  file format of the package, which should give enough information
+  about how to install it.
+
+  No two package files in the same repository should have the same
+  name and version.  If a package needs to be changed, the version
+  MUST be incremented.
+
+Workflows: The client application
+
+  Periodically, the client updater fetches a timestamp file from a
+  mirror.  If the timestamp in the file is up-to-date, the client
+  first checks to see whether the keys file listed is one that the
+  client has.  If not, the client fetches it, makes sure the hash of
+  the keys file matches the hash in the timestamp file, makes sure its
+  date is more recent than any keys file they have but not too far in
+  the future, and that it is signed by enough root keys that the
+  client recognizes.
+
+       [If the timestamp file is not up-to-date, the client tries a
+       few mirrors until it finds one with a good timestamp.]
+
+       [If the keys file from a mirror does not match the timestamp
+       file, the client tries a new mirror for both.]
+
+       [If the keys file is not signed by enough root keys, the client
+       warns the user and tries another mirror for both the timestamp
+       file and the keys file.]
+
+  Once the client has an up-to-date keys file, the client checks the
+  signature on the timestamp file.  Assuming it checks out, the client
+  refreshes the mirror list as needed, and refreshes any bundle files
+  to which the user is subscribed if the client does not have
+  the latest version of those files.  The client checks signatures on
+  these files, and fetches package metadata for any packages listed in
+  the bundle file that the client does not have, checks signatures on
+  these, and fetches binaries for packages that might need to be
+  installed or updated.  As the packages arrive, clients check their
+  hashes.
+
+  Once the client has gotten enough packages, it informs the user that
+  new packages have arrived, and asks them if they want to update.
+
+  Clients SHOULD cache at least the latest versions they have received
+  of all files.
+
+Workflow: Mirrors
+
+  Periodically, mirrors do an rsync or equivalent to fetch the latest
+  version of whatever parts of the repository have changed since the
+  version they currently hold.  Mirrors SHOULD replace older versions
+  of the repository idempotently, so that clients are less likely to
+  see inconsistant state.  Mirrors SHOULD validate the information
+  they receive, and not serve partial or inconsistant files.
+
+Workflow: Packagers
+
+  When a new binary package is done, the person making the package
+  runs a tool to generate and sign a package file, and sends both the
+  package and the package file to a repository admin.  Typically, the
+  base package file will be generated by inserting a version into a
+  template.
+
+  Packages MAY have as part of their build process a script to
+  generate the appropriately versioned package file.  This script
+  should at a minimum demand a build version, or use a timestamp in
+  place of a build version, to prevent two packages with the same
+  version from being created.
+
+Workflow: bundlers
+
+  When the packages in a bundle are done, the bundler runs a tool on
+  the package files to generate and sign a bundle file.  Typically,
+  this tool uses a template bundle file.
+
+Workflow: repository administrators
+
+  Repository administrators use a tool to validate signed files into the
+  repository.  The repository should not be altered manually.
+
+  This tool acts as follows:
+     - Package files may be added, but never replaced.
+     - Bundle files may be added, but never replaced.
+     - No file may be added unless it is syntactically valid and
+       signed by a key in the keys file authorized to sign files of
+       this type in this file's location location.
+
+     - A package file may not be added unless all of its binary
+       packages match their hashes.
+
+     - A bundle file may not be added unless all of its package files
+       are present and match their hashes.
+
+     - When adding a new keylist, bundle, or mirrors list, the
+       timestamp file must be regenerated immediately.
+
+Timing:
+
+  The timestamp file SHOULD be regenerated every 15 minutes.  Mirrors
+  SHOULD attempt to update every hour.  Clients SHOULD accept a
+  timestamp file up to 6 hours old.
+
+Format versioning and forward-compatibility:
+
+  All of the above formats include the ability to add more
+  attribute-value fields for backwards-compatible format changes.  If
+  we need to make a backwards incompatible format change, we create a
+  new filename for the new format.
+
+Key management and migration:
+
+  Root keys should be kept offline.  All keys except timestamp and
+  mirror keys should be stored encrypted.
+
+  All the formats above allow for multiple keys to sign a single
+  document.  To replace a compromised master key, it suffices to sign
+  keylist documents with both the compromised key and its replacement
+  until all clients have updated to a new version of the autoupdater.
+
+  To replace another key, it suffices to authorize the new key in the
+  keylist.  Note that a new package or bundle key must re-sign and
+  issue new versions of all packages or bundles it has generated.
+
