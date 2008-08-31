@@ -2,11 +2,11 @@
 
 Scope
 
-   This document descibes a repository and document format for use in
+   This document describes a repository and document format for use in
    distributing Tor bundle updates.  It is meant to be a component of
    an overall automatic update system.
 
-   Not described in this document is the design the packages or their
+   Not described in this document is the design of the packages or their
    install process, though some requirements are listed.
 
 Proposed code name
@@ -33,9 +33,9 @@ Metaformat
    We also use a braces notation to indicate elements that can occur
    in any order.  For example,
         (bread {flour+ eggs? yeast})
-   matches a list starting with "bread", and then containing a one or
-   more occurances of flours, zero or one occurances of eggs, and one
-   occurance of yeast, in any order.  This pattern matches (bread eggs
+   matches a list starting with "bread", and then containing one or
+   more  of flours, zero or one occurrences of eggs, and one
+   occurrence of yeast, in any order.  This pattern matches (bread eggs
    yeast flour) but not (bread yeast) or (bread flour eggs yeast
    macadamias).
 
@@ -64,11 +64,11 @@ Non-goals:
 
    This is not a general-purpose package manager like yum or apt: it
    assumes that users will want to have one or more of a set of
-   "bundles", not an arbitary selection of packages dependant on one
+   "bundles", not an arbitrary selection of packages dependant on one
    another.
 
    This is also not a general-purpose package format.  It assumes the
-   existance of an external package format that can handle install,
+   existence of an external package format that can handle install,
    update, remove, and version query.
 
 Architecture: Repository
@@ -357,8 +357,8 @@ Workflow: Mirrors
   version of whatever parts of the repository have changed since the
   version they currently hold.  Mirrors SHOULD replace older versions
   of the repository idempotently, so that clients are less likely to
-  see inconsistant state.  Mirrors SHOULD validate the information
-  they receive, and not serve partial or inconsistant files.
+  see inconsistent state.  Mirrors SHOULD validate the information
+  they receive, and not serve partial or inconsistent files.
 
 Workflow: Packagers
 
