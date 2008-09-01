@@ -78,7 +78,7 @@ Architecture: Repository
 
    A "package" is a single independent downloadable, installable
    binary archive.  It could be an MSI, an RPM, a DMG, or so on.
-   Every package is compiled version of some version of some piece of
+   Every package is a compiled instance of some piece of
    software (an 'application') for some (os, architecture,
    version) combinations.  Some packages are "glue" that make other
    packages work well together or get configured properly.
@@ -102,7 +102,7 @@ Architecture: Repository
 
 Architecture: Roles
 
-   Every role in the system are associated with a key.  Replacing
+   Every role in the system is associated with a key.  Replacing
    anything but a root key is supposed to be relatively easy.
 
    Root-keys sign other keys, and certify them as belonging to roles.
@@ -155,7 +155,7 @@ Directory layout
 
     /packages/packagename/os-arch/version/(some filename)
 
-         The actual files 
+         The actual files   [XXX finish sentence]
 
 File formats: general principles
 
@@ -187,7 +187,7 @@ File formats: general principles
           (signature ({(keyid K) (method M) (ATTR VAL)*}) SIG)+
        )
 
-   where: X is a list whose fist element describes the signed object.
+   where: X is a list whose first element describes the signed object.
           K is the identifier of a key signing the document
           M is the method to be used to make the signature
           (ATTR VAL) is an arbitrary list whose first element is a
@@ -283,7 +283,7 @@ File formats: bundle files
   elements of the order element are numbers defining the order in
   which the packages are installed, updated, and removed respectively.
   The "optional" element is present if the package is optional.
-  "Gloss" is an short utf-8 human-readable string explaining what the
+  "Gloss" is a short utf-8 human-readable string explaining what the
   package provides for the bundle; "longloss" is a longer such
   utf-8 string.
 
@@ -291,6 +291,9 @@ File formats: bundle files
   but to describe what the package provides for the bundle.  For
   example, "The Anonymous Email Bundle needs the Python Runtime to run
   Mixminion.")
+
+  [XXX consider translated strings here, if the gloss strings are ever
+   meant to be shown to users. -RD]
 
 File formats: package files
   (package
@@ -420,7 +423,7 @@ Key management and migration:
   mirror keys should be stored encrypted.
 
   All the formats above allow for multiple keys to sign a single
-  document.  To replace a compromised master key, it suffices to sign
+  document.  To replace a compromised root key, it suffices to sign
   keylist documents with both the compromised key and its replacement
   until all clients have updated to a new version of the autoupdater.
 
