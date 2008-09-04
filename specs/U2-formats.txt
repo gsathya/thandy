@@ -1,26 +1,245 @@
 
+0. Preliminaries
 
-Scope
+0.0. Scope
 
-   This document describes a repository and document format for use in
-   distributing Tor bundle updates.  It is meant to be a component of
-   an overall automatic update system.
+   This document describes a system for distributing Tor bundle updates.
 
-   Not described in this document is the design of the packages or their
-   install process, though some requirements are listed.
-
-Proposed code name
+0.1. Proposed code name
 
    Since "auto-update" is so generic, I've been thinking about going with
-   with "hapoc" or "glider" or "petaurus", all based on the sugar
-   glider you get when you search for "handy pocket creature".
+   "glider", based on the sugar glider you get when you search for "handy
+   pocket creature".  I haven't yet done a search to find out whether
+   somebody else is using the name, so we shouldn't get too attached to it
+   before we see if it's taken.
 
-Metaformat
+0.2. Goals
+
+   Once Tor was a single executable that you could just run.  Then it
+   required Privoxy.  Now, thanks to the Tor Browser Bundle and related
+   projects, a full installation can contain Tor, Privoxy, Torbutton,
+   Firefox, and more.
+
+   We need to keep this software updated.  When we make security fixes,
+   quick uptake helps narrow the window in which attackers can exploit
+   them.
+
+   We need updates to be easy.  Each additional step a user must take to
+   get updated means that more users will stay with older insecure
+   versions.
+
+   We need updates to be secure.  We're supposed to be good at crypto;
+   let's act like it.  There is no good reason in this day and age to
+   subject users to rollback attacks or unsigned packages or whatever.
+
+   We need administration to be simple.  Tor doesn't have a release
+   engineering team, so we can't add too many hard steps to putting out
+   a new release.
+
+   The system should be easy to implement; we may need to do multiple
+   implementations on the client side at least.
+
+0.2.1. Goals for package formats and PKIs
+
+   It should be possible to mirror a repository using only rsync and
+   cron.
+
+   Separate keys should be used for different people and different
+   roles.
+
+   Only a minimal set of keys should have to be kept online to keep
+   the system running.
+
+   The system should handle any single computer or system or person
+   being unavailable.
+
+   The formats and protocols should be pretty future-proof.
+
+0.3. Non-goals
+
+   This is not a general-purpose package manager like yum or apt: it
+   assumes that users will want to have one or more of a set of
+   "bundles", not an arbitrary selection of packages dependant on one
+   another.  (Rationale: these systems do what they do pretty well.)
+
+   This is also not a general-purpose package format.  It assumes the
+   existence of an external package format that can handle install,
+   update, remove, and version query.  (Rationale:
+
+1. System overview
+
+   The basic unit of updatability is a "bundle".  A bundle is a set of
+   software components, or "packages", plus some rules about installing
+   them.  Example bundles could be "Tor Browser, stable series" or
+   "Basic Tor, development series".
+
+   When Glider has responsibility for keeping a bundle up to date, we
+   say that a user has "subscribed" to that bundle.
+
+   Conceptually, there are four parts to keeping a bundle up to date:
+
+      Polling:
+        - Periodically, Glider asks a mirror whether there is a newer
+          version of some bundle that a user has subscribed to.  If so,
+          Glider determines what's in the bundle.
+
+      Fetching:
+        - If the bundle contains packages that Glider hasn't installed
+          or hasn't cached, it needs to download them from a mirror.
+          This can happen over any protocol; v1 should support at least
+          http and https-over-Tor.  V1 should also support resuming
+          partial downloads, since many users have unreliable
+          connections.
+
+          Later versions could support Bittorrent, or whatever.
+
+      Validation:
+        - Throughout the process, Glider must ensure that all the
+          bundles are signed correctly, all the packages are signed
+          correctly, and everything is up-to-date.
+
+          We want to specify this so that users can't be tricked about
+          the contents of a bundle, can't install a malicious package,
+          and can't be fooled into believing that an old bundle is
+          actually the latest.
+
+      Installation:
+        - Now Glider has a set of packages to install.  The format of
+          these packages will be platform-dependent: they could be pkg
+          files on OSX, MSI files on Win32, RPMs or DEBs on Linux, and
+          so on.  Glider should query the user for permission to start,
+          then install the packages.
+
+1.1. The repository
+
+   Each Glider instance knows about one or more "repositories".  A
+   repository is a filesystem somewhere that contains the packages in a
+   set of bundles, and some associated metadata.  A repository must
+   exist at one or more canonical hosts, and may have a number of full
+   or partial mirrors.
+
+   In v1, each Glider instance will know about only one repository.
+
+1.2. The PKI
+
+   The trust root for the whole system is, necessarily, whatever users
+   download when they first download a copy of Glider.  We need to make
+   sure that the first download happens from a site we trust, using
+   HTTPS.
+
+   Glider ships with root keys, which in turn are used to verify the
+   keys for all the other roles.  There are a few root keys, operated by
+   trusted admins for the system.  If root keys ever need to be changed,
+   we can just ship an update of Glider: it's supposed to be
+   self-updating anyway.
+
+   The root keys are only used to sign a 'key list' of all the other
+   keys and their roles.  A key list is valid if it has been signed by a
+   threshold of root keys.
+
+   Each package is signed with the key of its authorized builder.  For
+   example, one volunteer may be authorized to build the mac versions of
+   several packages, and another may be authorized to build the windows
+   version of just one.
+
+   Each bundle is signed with the key of its maintainer.  It's assumed
+   that the bundle maintainer might be the package maintainer for some
+   but not all of the packages.
+
+   The list of mirrors is also signed.  If the mirror list is
+   automatically updated, this key must be kept online; otherwise, it
+   can be offline.
+
+   To prevent an adversary from replaying an out-of-date signed
+   document, an automated process periodically signs a timestamped
+   statement containing the hashes of the mirror list, the latest
+   bundles, and the key list, using yet another special-purpose key.
+   This key must be kept online.
+
+1.3. Threat Model And Analysis
+
+   We assume an adversary who can operate compromised mirrors, and who
+   can possibly compromise the main repository.  At worst, such an
+   adversary can DOS users in a way that they can detect.
+
+   We're assuming for the moment an OSX/Win32-like execution model,
+   where all packages will run equal privilege, but occasionally
+   installation will require higher privilege.  This means that once a
+   hostile package is installed, it can basically do whatever it
+   wants.  As rootkit writers demonstrate, compromise is really
+   tenuous: any attacker who can induce a user to install a hostile
+   piece of code has, in effect, permanently compromised that user
+   until they reinstall.
+
+   Thus, if an adversary compromises enough keys to sign a compromised
+   package, or tricks a packager into signing a compromised package,
+   and manages to get that package into a signed bundle, the best we
+   can do is to limit the number of users who are affected.  We do
+   this by compartmentalizing signing keys so that only the package
+   and bundle in question are at risk.
+
+   (If we had replicated build processes and a bit-by-bit reliable
+   build process, we could have multiple packagers test that a binary
+   was built properly, and multiply sign it.  This would be effective
+   against an adversary compromising a single packaging key, but not
+   against one compromising a source repository.)
+
+2. The repository layout
+
+   The filesystem layout in the repository is used for two purposes:
+     - To give mirrors an easy way to mirror only some of the repository.
+     - To specify which parts of the repository a given key has the
+       authority to sign.
+
+   The following files exist in all repositories and mirrors:
+
+    /meta/keys.txt
+
+         Signed by the root keys; indicates keys and roles.
+         [???? I'm using the txt extension here.  Is that smart?]
+
+    /meta/mirrors.txt
+
+         Signed by the mirror key; indicates which parts of the
+         repository are mirrored at what mirrors.
+
+    /meta/timestamp.txt
+
+         Signed by the timestamp key; indicates hashes and timestamps
+         for the latest versions of keys.txt and mirrors.txt.  Also
+         indicates the latest version of each bundle for each os/arch.
+
+         This is the only file that needs to be downloaded for polling.
+
+    /bundleinfo/bundlename/os-arch/bundlename-os-arch-bundleversion.txt
+
+         Signed by the appropriate bundle key.  Describes what
+         packages make up a bundle, and what order to install,
+         uninstall, and upgrade them in.
+
+    /pkginfo/packagename/os-arch/version/packagename-os-arch-packageversion.txt
+
+         Signed by the appropriate package key.  Tells the name of the
+         file that makes up a package, its hash, and what procedure
+         is used to install it.
+
+    /packages/packagename/os-arch/version/(some filename)
+
+         The actual package file.  Its naming convention will depend
+         on the underlying packaging system.
+
+3. Document formats
+
+3.1. Metaformat
 
    All documents use Rivest's SEXP meta-format as documented at
      http://people.csail.mit.edu/rivest/sexp.html
    with the restriction that no "display hint" fields are to be used,
    and the base64 transit encoding isn't used either.
+
+   (We use SEXP because it's really easy to parse, really portable,
+   and unlike most other tagged data formats, has a
+   trivially-specified canonical format suitable for hashing.)
 
    In descriptions of syntax below, we use regex-style qualifiers, so
    that in
@@ -39,125 +258,7 @@ Metaformat
    yeast flour) but not (bread yeast) or (bread flour eggs yeast
    macadamias).
 
-
-Goals
-
-   It should be possible to mirror a repository using only rsync and cron.
-
-   Separate keys should be used for different people and different
-   roles.
-
-   Only a minimal set of keys should have to be kept online to keep
-   the system running.
-
-   The system should handle any single computer or system or person
-   being unavailable.
-
-   The system should be pretty future-proof.
-
-   The client-side of the architecture should be really easy to implement.
-
-Non-goals:
-
-   This is not a package format.  Instead, we reuse existing package
-   formats for each platform.
-
-   This is not a general-purpose package manager like yum or apt: it
-   assumes that users will want to have one or more of a set of
-   "bundles", not an arbitrary selection of packages dependant on one
-   another.
-
-   This is also not a general-purpose package format.  It assumes the
-   existence of an external package format that can handle install,
-   update, remove, and version query.
-
-Architecture: Repository
-
-   A "repository" is a directory hierarchy containing packages,
-   bundles, and metadata, all signed.
-
-   A "package" is a single independent downloadable, installable
-   binary archive.  It could be an MSI, an RPM, a DMG, or so on.
-   Every package is a compiled instance of some piece of
-   software (an 'application') for some (os, architecture,
-   version) combinations.  Some packages are "glue" that make other
-   packages work well together or get configured properly.
-
-   A "bundle" is a list of of packages to be installed together.
-   Examples might be "Tor Browser Bundle" or "Tor plus controller".  A
-   bundle is versioned, and every bundle is for a particular (os,
-   architecture) combination.  Bundles specify which order to install
-   or update their components.
-
-   Metadata is used to:
-     - Find mirrors
-     - Validate packages, bundles, and metadata
-     - Make sure information is up-to-date
-     - Determine which packages are in a bundle
-
-   The filesystem layout in the repository is used for two purposes:
-     - To give mirrors an easy way to mirror only some of the repository.
-     - To specify which parts of the repository a given key has the
-       authority to sign.
-
-Architecture: Roles
-
-   Every role in the system is associated with a key.  Replacing
-   anything but a root key is supposed to be relatively easy.
-
-   Root-keys sign other keys, and certify them as belonging to roles.
-   Clients are configured to know the root keys.
-
-   Bundle keys certify the contents of a bundle.
-
-   Package keys certify packages for a given program or set of
-   programs.
-
-   Mirror keys certify a list of mirrors.  We expect this to be an
-   automated process.
-
-   Timestamp keys certify that given versions of other metadata
-   documents are up-to-date.  They are the only keys that absolutely
-   need to be kept online.  (If they are not, timestamps won't be
-   generated.)
-
-Directory layout
-
-   The following files exist in all repositories and mirrors:
-
-    /meta/keys.txt
-
-         Signed by the root keys; indicates keys and roles.
-         [XXXX I'm using the txt extension here.  Is that smart?]
-
-    /meta/mirrors.txt
-
-         Signed by the mirror key; indicates which parts of the repo
-         are mirrored where.
-
-    /meta/timestamp.txt
-
-         Signed by the timestamp key; indicates hashes and timestamps
-         for the latest versions of keys.txt and mirrors.txt.  Also
-         indicates the latest version of each bundle for each os/arch.
-
-    /bundleinfo/bundlename/os-arch/bundlename-os-arch-bundleversion.txt
-
-         Signed by the appropriate bundle key.  Describes what
-         packages make up a bundle, and what order to install,
-         uninstall, and upgrade them in.
-
-    /pkginfo/packagename/os-arch/version/packagename-os-arch-packageversion.txt
-
-         Signed by the appropriate package key.  Tells the name of the
-         file that makes up the bundle, its hash, and what procedure
-         is used to install it.
-
-    /packages/packagename/os-arch/version/(some filename)
-
-         The actual files   [XXX finish sentence]
-
-File formats: general principles
+3.2. File formats: general principles
 
    We use tagged lists (lists whose first element is a string) to
    indicate typed objects.  Tags are generally lower-case, with
@@ -211,11 +312,37 @@ File formats: general principles
    The ID of a key is the type field concatenated with the SHA-256
    hash of the canonical encoding of the KEYVAL field.
 
-   We define one keytype at present: 'rsa'.  The KEYVAL in this case is a
-   2-element list of (e p), with both values given in big-endian
-   binary format.  [This makes keys 45-60% more compact.]
+   We define one keytype at present: 'rsa'.  The KEYVAL in this case
+   is a 2-element list of (e n), with both values given in big-endian
+   binary format.  [This makes keys 45-60% more compact than using
+   decimal integers.]
 
-File formats: key list
+   All RSA keys must be at least 2048 bits long.
+
+
+   Every role in the system is associated with a key.  Replacing
+   anything but a root key is supposed to be relatively easy.
+
+   Root-keys sign other keys, and certify them as belonging to roles.
+   Clients are configured to know the root keys.
+
+   Bundle keys certify the contents of a bundle.
+
+   Package keys certify packages for a given program or set of
+   programs.
+
+   Mirror keys certify a list of mirrors.  We expect this to be an
+   automated process.
+
+   Timestamp keys certify that given versions of other metadata
+   documents are up-to-date.  They are the only keys that absolutely
+   need to be kept online.  (If they are not, timestamps won't be
+   generated.)
+
+3.3. File formats: key list
+
+   The key list file is signed by multiple root keys.  It indicates
+   which keys are authorized to sign which parts of the repository.
 
    (keylist
      (ts TIME)
@@ -228,13 +355,17 @@ File formats: key list
    MUST NOT replace a file with an older one, and SHOULD NOT accept a
    file too far in the future.
 
-   A ROLE is one of "timestamp" "mirrors" "bundle" or "package"
+   A ROLE is one of "timestamp" "mirrors" "bundle" or "package".
 
    PATH is a path relative to the top of the directory hierarchy.  It
    may contain "*" elements to indicate "any file", and may end with a
    "/**" element to indicate all files under a given point.
 
-File formats: mirror list
+3.4. File formats: mirror list
+
+   The mirror list is signed by a mirror key.  It indicates which
+   mirrors are active and believed to be mirroring which parts of the
+   repository.
 
    (mirrorlist
      (ts TIME)
@@ -251,7 +382,12 @@ File formats: mirror list
   elements are the components describing how much of the packages
   directory is mirrored.  Their format is as in the keylist file.
 
-File formats: timestamp files
+3.5. File formats: timestamp files
+
+  The timestamp file is signed by a timestamp key.  It indicates the
+  latest versions of other files, and contains a regularly updated
+  timestamp to prevent rollback attacks.
+
   (ts
     ({(at TIME)
       (m TIME MIRRORLISTHASH)
@@ -264,7 +400,7 @@ File formats: timestamp files
   file; and the 'b' entries are a list of the latest version of each
   bundles and their locations and hashes.
 
-File formats: bundle files
+3.6. File formats: bundle files
 
   (bundle
     (at TIME)
@@ -292,10 +428,12 @@ File formats: bundle files
   example, "The Anonymous Email Bundle needs the Python Runtime to run
   Mixminion.")
 
-  [XXX consider translated strings here, if the gloss strings are ever
-   meant to be shown to users. -RD]
+  Multiple gloss strings are allowed; each should have a different
+  language. The UI should display the must appropriate language to the
+  user.
 
-File formats: package files
+3.7. File formats: package files
+
   (package
     ({(name NAME)
      (version VERSION)
@@ -316,7 +454,11 @@ File formats: package files
   name and version.  If a package needs to be changed, the version
   MUST be incremented.
 
-Workflows: The client application
+  Descriptions are tagged with languages in the same way as glosses.
+
+4. Detailed Workflows
+
+4.1. The client application
 
   Periodically, the client updater fetches a timestamp file from a
   mirror.  If the timestamp in the file is up-to-date, the client
@@ -354,7 +496,7 @@ Workflows: The client application
   Clients SHOULD cache at least the latest versions they have received
   of all files.
 
-Workflow: Mirrors
+4.2. Mirrors
 
   Periodically, mirrors do an rsync or equivalent to fetch the latest
   version of whatever parts of the repository have changed since the
@@ -363,7 +505,7 @@ Workflow: Mirrors
   see inconsistent state.  Mirrors SHOULD validate the information
   they receive, and not serve partial or inconsistent files.
 
-Workflow: Packagers
+4.3. Workflow: Packagers
 
   When a new binary package is done, the person making the package
   runs a tool to generate and sign a package file, and sends both the
@@ -377,13 +519,13 @@ Workflow: Packagers
   place of a build version, to prevent two packages with the same
   version from being created.
 
-Workflow: bundlers
+4.4. Workflow: bundlers
 
   When the packages in a bundle are done, the bundler runs a tool on
   the package files to generate and sign a bundle file.  Typically,
   this tool uses a template bundle file.
 
-Workflow: repository administrators
+4.5. Workflow: repository administrators
 
   Repository administrators use a tool to validate signed files into the
   repository.  The repository should not be altered manually.
@@ -404,20 +546,22 @@ Workflow: repository administrators
      - When adding a new keylist, bundle, or mirrors list, the
        timestamp file must be regenerated immediately.
 
-Timing:
+5. Parameter setting and corner cases.
+
+5.1. Timing:
 
   The timestamp file SHOULD be regenerated every 15 minutes.  Mirrors
   SHOULD attempt to update every hour.  Clients SHOULD accept a
   timestamp file up to 6 hours old.
 
-Format versioning and forward-compatibility:
+5.2. Format versioning and forward-compatibility:
 
   All of the above formats include the ability to add more
   attribute-value fields for backwards-compatible format changes.  If
   we need to make a backwards incompatible format change, we create a
   new filename for the new format.
 
-Key management and migration:
+5.3. Key management and migration:
 
   Root keys should be kept offline.  All keys except timestamp and
   mirror keys should be stored encrypted.
