@@ -370,7 +370,8 @@
    (mirrorlist
      (ts TIME)
      (mirrors
-       ( (mirror ({(name N) (urlbase U) (contents PATH+) (ATTR VAL)})) * )
+       ( (mirror ({(name N) (urlbase U) (contents PATH+) (weight W)
+                   (official)?  (ATTR VAL)})) * )
      ...
   )
 
@@ -381,6 +382,11 @@
   base (i.e., the parent of the "meta" directory); and the PATH
   elements are the components describing how much of the packages
   directory is mirrored.  Their format is as in the keylist file.
+
+  W is an integer used to weight mirrors when picking at random;
+  mirrors with more bandwidth should have higher weigths.   The
+  "official" element should only be present if the mirror is (one of
+  the) official repositories operated by the Tor Project.
 
 3.5. File formats: timestamp files
 
@@ -496,6 +502,12 @@
   Clients SHOULD cache at least the latest versions they have received
   of all files.
 
+4.1.1. Download preferences
+
+  Users should be able to specify that packages must be only
+  downloaded over Tor, or must only be downloaded over encrypted
+  protocols, or both.  Users should also be able to force 
+
 4.2. Mirrors
 
   Periodically, mirrors do an rsync or equivalent to fetch the latest
@@ -574,4 +586,42 @@
   To replace another key, it suffices to authorize the new key in the
   keylist.  Note that a new package or bundle key must re-sign and
   issue new versions of all packages or bundles it has generated.
+
+
+
+F. Future directions and open questions
+
+F.1. Package decomposition
+
+  It would be neat to decouple existing packages.  Right now, we'd
+  never want a windows user to have to fetch an openssl dll and Tor
+  separately.  But if they're using an auto-update tool, it'd be
+  pretty keen to have them not need to fetch a new openssl every time
+  Tor has a bugfix.
+
+F.2. Caching at Tor servers.
+
+  See Tor Proposal number 127.
+
+F.3. Support for more download methods
+
+  Ozymandns, chunked downloads, and bittorrent would all be neat
+  ideas.
+
+
+R. Ideas I'm rejecting for the moment
+
+R.1. Considering recommended versions from Tor consensus directory documents
+
+  This requires a working Tor to update Tor; that's not necessarily a
+  great idea.
+
+R.2. Integration with existing GPG signatures
+
+  The OpenPGP signature and key format is so complicated that you'd
+  have to be mad to touch it.
+
+
+
+
 
