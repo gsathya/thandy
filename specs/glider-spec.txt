@@ -506,7 +506,9 @@
 
   Users should be able to specify that packages must be only
   downloaded over Tor, or must only be downloaded over encrypted
-  protocols, or both.  Users should also be able to force 
+  protocols, or both.  Users should also be able to express preference
+  for Tor vs non-Tor and encrypted vs non-encrypted, even if they
+  allow both.
 
 4.2. Mirrors
 
