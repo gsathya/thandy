@@ -119,8 +119,10 @@
         - Now Glider has a set of packages to install.  The format of
           these packages will be platform-dependent: they could be pkg
           files on OSX, MSI files on Win32, RPMs or DEBs on Linux, and
-          so on.  Glider should query the user for permission to start,
-          then install the packages.
+          so on.  Glider should query the user for permission to start
+          installing packages, then install the packages.  (All other
+          steps should generally happen automatically, in the
+          background, without needing user intervention.)
 
 1.1. The repository
 
@@ -574,7 +576,7 @@
 
 5. Parameter setting and corner cases.
 
-5.1. Timing:
+5.1. Timing
 
   The timestamp file SHOULD be regenerated every 15 minutes.  Mirrors
   SHOULD attempt to update every hour.  Clients SHOULD accept a
@@ -622,6 +624,11 @@ F.3. Support for more download methods
   Ozymandns, chunked downloads, and bittorrent would all be neat
   ideas.
 
+F.4. Support for bogus clocks.
+
+  Glider should have a user configurable "no, my clock is _supposed_
+  to be wrong" mode, since lots of users seem to _like_ having their
+  clocks in 1970 forever.
 
 R. Ideas I'm rejecting for the moment
 
