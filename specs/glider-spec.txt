@@ -1,9 +1,12 @@
 
+             Glider: Automatic updates for Tor bundles
+
 0. Preliminaries
 
 0.0. Scope
 
-   This document describes a system for distributing Tor bundle updates.
+   This document describes a system for distributing Tor binary bundle
+   updates.
 
 0.1. Proposed code name
 
@@ -13,7 +16,27 @@
    somebody else is using the name, so we shouldn't get too attached to it
    before we see if it's taken.
 
-0.2. Goals
+0.2. Non-goals
+
+   This is not meant to replace any existing download mechanism for
+   users who prefer that mechanism.  For example, just downloading
+   source will still work fine.
+
+   Similarly, we're not trying to force users who do not want to use
+   downloaded binaries to use them, or to force users who do not want
+   automatic updates to get them.  {This should be obvious, but enough
+   people have asked that I'm putting it in the document.}
+
+   This is not a general-purpose package manager like yum or apt: it
+   assumes that users will want to have one or more of a set of
+   "bundles", not an arbitrary selection of packages dependant on one
+   another.  (Rationale: these systems do what they do pretty well.)
+
+   This is also not a general-purpose package format.  It assumes the
+   existence of an external package format that can handle install,
+   update, remove, and version query.
+
+0.3. Goals
 
    Once Tor was a single executable that you could just run.  Then it
    required Privoxy.  Now, thanks to the Tor Browser Bundle and related
@@ -39,7 +62,7 @@
    The system should be easy to implement; we may need to do multiple
    implementations on the client side at least.
 
-0.2.1. Goals for package formats and PKIs
+0.3.1. Goals for package formats and PKIs
 
    It should be possible to mirror a repository using only rsync and
    cron.
@@ -54,17 +77,6 @@
    being unavailable.
 
    The formats and protocols should be pretty future-proof.
-
-0.3. Non-goals
-
-   This is not a general-purpose package manager like yum or apt: it
-   assumes that users will want to have one or more of a set of
-   "bundles", not an arbitrary selection of packages dependant on one
-   another.  (Rationale: these systems do what they do pretty well.)
-
-   This is also not a general-purpose package format.  It assumes the
-   existence of an external package format that can handle install,
-   update, remove, and version query.  (Rationale:
 
 1. System overview
 
