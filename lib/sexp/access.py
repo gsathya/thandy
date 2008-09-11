@@ -3,7 +3,9 @@ import re
 import sys
 
 def s_tag(s):
-    """
+    """Returns the tag of an s-expression (that is, the string that is its
+       first element), or None of the expression has no tag.
+
     >>> s_tag("a string") is None
     True
     >>> s_tag(["a-tagged", "list"])
@@ -17,15 +19,54 @@ def s_tag(s):
         return None
 
 def s_child(s, tag):
+    """Return the fist child of 's' whose tag is 'tag', or None if no such
+       child exists.
+
+    >>> x = [ 'example', ['greeting', 'hello'], [ 'world', 'earth'] ]
+    >>> s_child(x, "greeting")
+    ['greeting', 'hello']
+    >>> s_child(x, "world")
+    ['world', 'earth']
+    >>> print s_child(x, "foo")
+    None
+    """
+
     for child in s:
         if s_tag(child) == tag:
             return child
     return None
 
 def s_children(s, tag):
+    """Returns a generator yielding all children of 's' whose tag is 'tag'.
+
+    >>> x = [ ['quark', 'top'], ['cheese', 'stilton'], ['quark', 'bottom'],
+    ...       ['cheese', 'cheddar'], "cheese" ]
+    >>> list(s_children(x, "Foo"))
+    []
+    >>> list(s_children(x, "cheese"))
+    [['cheese', 'stilton'], ['cheese', 'cheddar']]
+    """
     return (ch for ch in s if s_tag(ch) == tag)
 
 def s_descendants(s, tags=()):
+    """Yield every descendant of 's' whose tag is in 'tags'.  If 'tags' is
+       false, yield every descendant of s.  Items are returned in depth-first
+       order.
+
+    >>> x = [ 'foo', ['bar', ['foo', 'quuz'], ['foo', ['foo', 'zilch']] ],
+    ...      ['foo', 'quum'], ['mulch', 'mulchy', 'foo', ['foo', 'baaz']]]
+    >>> list(s_descendants(x, ['mulch']))
+    [['mulch', 'mulchy', 'foo', ['foo', 'baaz']]]
+    >>> for item in s_descendants(x, ['foo']): print item
+    ['foo', 'quuz']
+    ['foo', ['foo', 'zilch']]
+    ['foo', 'zilch']
+    ['foo', 'quum']
+    ['foo', 'baaz']
+    >>> x = ['a', 'b', 'c', ['d', ['e', 'f']], ['g']]
+    >>> list(s_descendants(x))
+    [['d', ['e', 'f']], ['e', 'f'], ['g']]
+    """
     stack = [ ]
     push = stack.append
     pop = stack.pop
@@ -40,18 +81,48 @@ def s_descendants(s, tags=()):
         if isinstance(s[idx], str):
             idx += 1
             continue
-        if s_tag(s[idx]) in tags:
+        if not tags or s_tag(s[idx]) in tags:
             yield s[idx]
+        push((s, idx+1))
+        s = s[idx]
+        idx = 0
 
 
 class SExpr(list):
+    """Wraps an s-expresion list to return its tagged children as attributes.
+
+    >>> s = [ 'cat', ['cheezburger', 'can has'], ['laser', 'can not has'],
+    ...       ['adjectives', ['furry', 'yes'], ['nuclear', 'no']]]
+    >>> s = SExpr(s)
+    >>> s[0]
+    'cat'
+    >>> s_tag(s)
+    'cat'
+    >>> s.cheezburger
+    ['cheezburger', 'can has']
+    >>> s.cheezburger  # Check caching.
+    ['cheezburger', 'can has']
+    >>> s.adjectives.furry
+    ['furry', 'yes']
+    >>> s.adjectives.nuclear
+    ['nuclear', 'no']
+    >>> s.do_not_want
+    Traceback (most recent call last):
+    ...
+    AttributeError: do_not_want
+    """
+
     def __init__(self, stuff=()):
         list.__init__(self, stuff)
         self._d = None
 
     def __getattr__(self, item):
         if self._d is None: self._buildDict()
-        return self[self._d[item]]
+        try:
+            idx = self._d[item]
+        except KeyError:
+            raise AttributeError(item)
+        return self[idx]
 
     def __getitem__(self, idx):
         item = list.__getitem__(self, idx)
@@ -67,8 +138,8 @@ class SExpr(list):
             if t is not None:
                 d[t] = idx
 
-def _s_lookup_all(s, path, callback):
 
+def _s_lookup_all(s, path, callback):
     # XXXX: Watch out; ** gets pretty heavy pretty fast.
 
     if isinstance(path, str):
@@ -84,17 +155,17 @@ def _s_lookup_all(s, path, callback):
         if p_item == '*':
             for ch in s:
                 if not isinstance(ch, str):
-                    _s_lookup_all(s, path[p_idx+1:], callback)
+                    _s_lookup_all(ch, path[p_idx+1:], callback)
             return
         elif p_item == '**':
             for ch in s_descendants(s):
                 if not isinstance(ch, str):
-                    _s_lookup_all(s, path[p_idx+1:], callback)
+                    _s_lookup_all(ch, path[p_idx+1:], callback)
             return
         elif p_item.startswith('**'):
             for ch in s_descendants(s):
                 if s_tag(ch) == p_item[2:]:
-                    _s_lookup_all(s, path[p_idx+1:], callback)
+                    _s_lookup_all(ch, path[p_idx+1:], callback)
         else:
             s = s_child(s, p_item)
             if s is None:
@@ -103,6 +174,26 @@ def _s_lookup_all(s, path, callback):
     callback(s)
 
 def s_lookup_all(s, path):
+    """Path-based lookup.  "*" matches any single element; "**" matches all
+       descendants.  Not too efficient.
+
+    >>> x = ['alice',
+    ...           ['father', 'bob', ['mother', 'carol'], ['father', 'dave']],
+    ...           ['mother', 'eve', ['mother', 'frances', ['dog', 'spot']],
+    ...                             ['father', 'gill']]]
+    >>> s_lookup_all(x, "father")
+    [['father', 'bob', ['mother', 'carol'], ['father', 'dave']]]
+    >>> s_lookup_all(x, "father.mother")
+    [['mother', 'carol']]
+    >>> s_lookup_all(x, "*.mother")
+    [['mother', 'carol'], ['mother', 'frances', ['dog', 'spot']]]
+    >>> s_lookup_all(x, "**.dog")
+    [['dog', 'spot']]
+    >>> s_lookup_all(x, "**mother.dog")
+    [['dog', 'spot']]
+    >>> s_lookup_all(x, "mother.*.dog")
+    [['dog', 'spot']]
+    """
     result = []
     _s_lookup_all(s, path, result.append)
     return result
@@ -113,24 +204,45 @@ def s_lookup(s, path):
         return r[0]
     return None
 
-class _Singleton:
-    def isSingleton(self):
-        return True
-    def matches(self, item):
+### Schema objects. You shouldn't instantiate these by hand; use
+### parseSchema instead.
+
+class Schema:
+    """A schema represents a pattern to be applied to s-expressions.
+       Generate them with parseSchema.
+    """
+    def matches(self, s):
+        """Return true iff s matches this schema."""
+        raise NotImplemented()
+    def rep(self):
+        """Return the s-expression representing this schema."""
         raise NotImplemented()
 
+class _Singleton(Schema):
+    '''superclass for all schemas that represent a single string or list.'''
+    def isSingleton(self):
+        return True
+
     def clear(self):
+        '''used during parsing.  resets this schema to an
+           I-have-matched-nothing state. '''
         self._got = False
     def matchItem(self, item):
+        '''used during parsing.  Returns true iff this schema can consume
+           item in its current state.'''
         if not self._got and self.matches(item):
             self._got = True
             return True
         else:
             return False
     def isSatisfied(self):
+        '''used during parsing.  Returns true iff this schema would be
+           satisfied parsing no more items.'''
         return self._got
 
-class _Span:
+class _Span(Schema):
+    '''superclass for all schemas that represent a variable number of strings
+       or lists.'''
     def isSingleton(self):
         return False
     def clear(self):
@@ -141,16 +253,19 @@ class _Span:
         raise NotImplemented()
 
 class _AnyItem(_Singleton):
+    'schema representing any item'
     def matches(self,item):
         return True
     def rep(self):
         return "?"
 class _AnyString(_Singleton):
+    'schema representing any single string'
     def matches(self,item):
         return isinstance(item, str)
     def rep(self):
         return "."
 class _ExactString(_Singleton):
+    'schema that matches only a particular string'
     def __init__(self, s):
         self._s = s
     def matches(self, item):
@@ -158,6 +273,7 @@ class _ExactString(_Singleton):
     def rep(self):
         return "=%s"%self._s
 class _ReString(_Singleton):
+    'schema that matches all strings following a particular regex.'
     def __init__(self, s, regex=None):
         if regex is None:
             regex = re.compile(s)
@@ -171,6 +287,7 @@ class _ReString(_Singleton):
     def rep(self):
         return "%s"%self._s
 class _List(_Singleton):
+    'schema that matches any list whose items match a sequence of schemas'
     def __init__(self, subpatterns):
         self._pats = subpatterns
     def clear(self):
@@ -215,14 +332,16 @@ class _List(_Singleton):
         return [ p.rep() for p in self._pats ]
 
 class _AnyItems(_Span):
+    '''schema matching any number of any items'''
     def matchItem(self, item):
         return True
     def isSatisfied(self):
         return True
     def rep(self):
-        return "*"
+        return "_"
 
 class _NMatches(_Span):
+    'schema matching another schema a given number of times.'
     def __init__(self, alternatives, lo, hi):
         self.lo = lo
         self.hi = hi
@@ -258,6 +377,8 @@ class _NMatches(_Span):
         return result
 
 class _Unordered(_Span):
+    '''schema containing a number of subitems, all of which must match in
+       some order.'''
     def __init__(self, alternatives):
         self.alternatives = alternatives
     def clear(self):
@@ -283,14 +404,55 @@ class SchemaFormatError(Exception):
 
 _RE_PAT = re.compile(r'/((?:[\\.]|[^\\/]+)*)/([ilmstx]*)', re.I)
 
-def parseSchema(s, table):
+def parseSchema(s, table=None):
+    """Return a schema object to represent a possible set of s-expressions.
+       The syntax is:
+        "=string" matches a string itself.
+        "*" matches any number of items and can occur only at the end of a list.
+        "_" matches a single item.
+        "." matches any string.
+        "/re/" matches a regex.
+        ".name" matches a named schema stored in the map 'table'.
 
+        (i1 i2 i3)         matches a list of i1 followed by i2 followed by i3.
+
+        (:maybe  i1)       matches zero or one of i1.
+        (:oneof  i1 i2 i3) matches any one of the items i1, i2, i3.
+        (:anyof  i1 i2 i3) matches zero or more of the items i1, i2, i3.
+        (:someof i1 i2 i3) matches one or more of i1, i2, and i3.
+
+        (:unordered i1 i2 i3) matches all of i1, i2, and i3, in any order.
+
+        The matching algorithm is a stupid greedy algorithm.  If you need to
+        check stuff it can't handle, write a new thing.
+
+    >>> import sexp.parse
+    >>> P = sexp.parse.parse
+    >>> PS = lambda s: parseSchema(sexp.parse.parse(s))
+    >>> S1 = PS("(=hello _ . /.*geuse/)")
+    >>> S1.matches(P("(hello (my little) 11:friend from Betelgeuse)"))
+    True
+    >>> S1.matches(P("(hello (my little) (friend from) Betelgeuse)"))
+    False
+    >>> S1.matches(P("(hello (my little) 11:friend from Betelgeuse Prime)"))
+    False
+    >>> S1.matches(P("(hello (my little) friendfrom BetelgeusePrime)"))
+    False
+
+    >>> S2 = PS("(=greetings (:oneof =world =gentlebeings) *)")
+    >>> S2.matches(P("greetings"))
+    False
+    >>> S2.matches(P("(greetings gentlebeings)"))
+    True
+    >>> S2.matches(P("(greetings world please take us to (your leader))"))
+    True
+    """
     if isinstance(s, str):
         if not len(s):
             raise SchemaFormatError("Empty string encountered")
         if s == '*':
             return _AnyItems()
-        elif s == '?':
+        elif s == '_':
             return _AnyItem()
         elif s == '.':
             return _AnyString()
@@ -350,24 +512,4 @@ def parseSchema(s, table):
             return _Unordered(subitems)
     else:
         return _List([ parseSchema(i, table) for i in s ])
-
-# Schema format:
-#   "=string" matches a string itself.
-#   "*" matches any number of items and can occur only at the end of a list.
-#   "?" matches a single item.
-#   "." matches any string.
-#   "/re/" matches a regex.
-#   ".name" matches a named schema
-#
-#   (i1 i2 i3)         matches a list of i1 followed by i2 followed by i3.
-#
-#   (:maybe  i1)       matches zero or one of i1.
-#   (:oneof  i1 i2 i3) matches any one of the items i1, i2, i3.
-#   (:anyof  i1 i2 i3) matches zero or more of the items i1, i2, i3.
-#   (:someof i1 i2 i3) matches one or more of i1, i2, and i3.
-#
-#   (:unordered i1 i2 i3) matches all of i1, i2, and i3, in any order.
-#
-# The matching algorithm is a stupid greedy algorithm.  If you need to
-# check stuff it can't handle, write a new thing.
 
