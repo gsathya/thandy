@@ -1,0 +1,37 @@
+
+
+o Write spec
+
+. Write server-side code (python)
+  o S-expression lib
+  . Code to manage data formats
+  - Code to wrangle private keys
+    - Generate
+    - Store, load (password-protected)
+    - Print for posterity
+
+  - Code to generate timestamp files
+  - Code to generate mirror files
+  - Code to generate keylist files, and add new keys to them, and
+    remove keys.
+
+- Write client-side code
+  - Decide early if a python implementation will do for v1.
+    IF SO:
+     - Adjust httplib, urllib2 to use socks4a.
+       - Check SOCKS package for suitability as basis for socks4a support?
+     - Look into best packageing practices
+    IF NOT:
+     - Maybe use curllib for downloading, unless there's something
+       better.
+     - Check out Ron's reference code for s-expression handling.
+
+  - Write cacheing code
+  - Write code to pick a mirror
+  - Write code to grab a timestamp file and figure out what to do.
+  - Write code to update other files
+  - Write code to run, telling another process about status,
+    eventually coming up with a list of packages to install or an
+    "A-OK" signal.
+
+  - GUI
