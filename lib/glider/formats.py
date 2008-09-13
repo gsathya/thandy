@@ -1,27 +1,11 @@
 
-import OpenSSL.crypto
-
 import sexp.access
 import sexp.encode
 import time
 import re
 
-class UnknownMethod(Exception):
+class FormatException(Exception):
     pass
-
-class PublicKey:
-    def format(self):
-        raise NotImplemented()
-    def sign(self, data):
-        # returns a list of method,signature tuples.
-        raise NotImplemented()
-    def checkSignature(self, method, data, signature):
-        # returns True, False, or raises UnknownMethod.
-        raise NotImplemented()
-    def getKeyID(self):
-        raise NotImplemented()
-    def getRoles(self):
-        raise NotImplemented()
 
 class KeyDB:
     def __init__(self):
@@ -31,18 +15,31 @@ class KeyDB:
     def getKey(self, keyid):
         return self.keys[keyid]
 
+_rolePathCache = {}
 def rolePathMatches(rolePath, path):
     """
 
-    >>> rolePath.matches("a/b/c/", "a/b/c/")
+    >>> rolePathMatches("a/b/c/", "a/b/c/")
     True
-    >>> rolePath.matches("**/c.*", "a/b/c.txt")
+    >>> rolePathMatches("**/c.*", "a/b/c.txt")
     True
+    >>> rolePathMatches("**/c.*", "a/b/c.txt/foo")
+    False
+    >>> rolePathMatches("a/*/c", "a/b/c")
+    True
+    >>> rolePathMatches("a/*/c", "a/b/c.txt")
+    False
+    >>> rolePathMatches("a/*/c", "a/b/c.txt") #Check cache
+    False
     """
-    rolePath = re.escape(rolePath).replace(r'\*\*', r'.*')
-    rolePath = rolePath.replace(r'\*', r'[^/]*')
-    rolePath += "$"
-    return re.match(rolePath, path) != None
+    try:
+        regex = _rolePathCache[rolePath]
+    except KeyError:
+        rolePath = re.escape(rolePath).replace(r'\*\*', r'.*')
+        rolePath = rolePath.replace(r'\*', r'[^/]*')
+        rolePath += "$"
+        regex = _rolePathCache[rolePath] = re.compile(rolePath)
+    return regex.match(path) != None
 
 def checkSignatures(signed, keyDB, role, path):
     goodSigs = []
@@ -86,21 +83,41 @@ def sign(signed, key):
     signed[2:] = oldsignatures
 
     for method, sig in key.sign(s):
-        signed.append(['signature', [['keyid', keyid], ['method', method]]
+        signed.append(['signature', [['keyid', keyid], ['method', method]],
                        sig])
 
 def formatTime(t):
+    """
+    >>> formatTime(1221265172)
+    '2008-09-13 00:19:32'
+    """
     return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(t))
 
 def parseTime(s):
     return time.timegm(time.strptime(s, "%Y-%m-%d %H:%M:%S"))
 
+def _parseSchema(s, t=None):
+    sexpr = sexp.parse.parse(s)
+    schema = sexp.access.parseSchema(sexpr, t)
+    return schema
 
-TIME_SCHEMA = r"""/\{d}4-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/"""
+SCHEMA_TABLE = { }
 
-ATTRS_SCHEMA = r"""(:anyof (_ *))"""
+PUBKEY_TEMPLATE = r"""
+  (=pubkey ((:unordered (=type .) (:anyof (. _)))) _)
+"""
 
-SIGNED_SCHEMA = r"""
+SCHEMA_TABLE['PUBKEY'] = _parseSchema(PUBKEY_TEMPLATE)
+
+TIME_TEMPLATE = r"""/\{d}4-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/"""
+
+SCHEMA_TABLE['TIME'] = sexp.access.parseSchema(TIME_TEMPLATE)
+
+ATTRS_TEMPLATE = r"""(:anyof (_ *))"""
+
+SCHEMA_TABLE['ATTRS'] = _parseSchema(ATTRS_TEMPLATE)
+
+SIGNED_TEMPLATE = r"""
  (=signed
    _
    (:someof
@@ -109,7 +126,9 @@ SIGNED_SCHEMA = r"""
    )
  )"""
 
-KEYFILE_SCHEMA = r"""
+SIGNED_SCHEMA = _parseSchema(SIGNED_TEMPLATE, SCHEMA_TABLE)
+
+KEYFILE_TEMPLATE = r"""
  (=keylist
    (=ts .TIME)
    (=keys
@@ -119,7 +138,9 @@ KEYFILE_SCHEMA = r"""
    *
  )"""
 
-MIRRORLIST_SCHEMA = r"""
+KEYFILE_SCHEMA = _parseSchema(KEYFILE_TEMPLATE, SCHEMA_TABLE)
+
+MIRRORLIST_TEMPLATE = r"""
  (=mirrorlist
    (=ts .TIME)
    (=mirrors (:anyof
@@ -128,13 +149,17 @@ MIRRORLIST_SCHEMA = r"""
    *)
 """
 
-TIMESTAMP_SCHEMA = r"""
+MIRRORLIST_SCHEMA = _parseSchema(MIRRORLIST_TEMPLATE, SCHEMA_TABLE)
+
+TIMESTAMP_TEMPLATE = r"""
  (=ts
    ((:unordered (=at .TIME) (=m .TIME .) (=k .TIME .)
            (:anyof (=b . . .TIME . .)) .ATTRS))
  )"""
 
-BUNDLE_SCHEMA = r"""
+TIMESTAMP_SCHEMA = _parseSchema(TIMESTAMP_TEMPLATE, SCHEMA_TABLE)
+
+BUNDLE_TEMPLATE = r"""
  (=bundle
    (=at .TIME)
    (=os .)
@@ -152,15 +177,19 @@ BUNDLE_SCHEMA = r"""
    *
  )"""
 
-PACKAGE_SCHEMA = r"""
+BUNDLE_SCHEMA = _parseSchema(BUNDLE_TEMPLATE, SCHEMA_TABLE)
+
+PACKAGE_TEMPLATE = r"""
  (=package
-  ((:unordred (=name .)
-              (=version .)
-              (=format . (.ATTRS))
-              (=path .)
-              (=ts .TIME)
-              (=digest .)
-              (:anyof (=shortdesc . .))
-              (:anyof (=longdesc . .))
-              .ATTRS)))
+  ((:unordered (=name .)
+               (=version .)
+               (=format . (.ATTRS))
+               (=path .)
+               (=ts .TIME)
+               (=digest .)
+               (:anyof (=shortdesc . .))
+               (:anyof (=longdesc . .))
+               .ATTRS)))
 """
+
+PACKAGE_SCHEMA = _parseSchema(PACKAGE_TEMPLATE, SCHEMA_TABLE)
