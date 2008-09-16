@@ -15,7 +15,7 @@ def suite():
     suite = unittest.TestSuite()
 
     suite.addTest(doctest.DocTestSuite(glider.formats))
-    #suite.addTest(doctest.DocTestSuite(sexp.parse))
+    suite.addTest(doctest.DocTestSuite(glider.keys))
 
     loader = unittest.TestLoader()
     suite.addTest(loader.loadTestsFromModule(glider.tests))

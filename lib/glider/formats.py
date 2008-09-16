@@ -35,6 +35,7 @@ def rolePathMatches(rolePath, path):
     try:
         regex = _rolePathCache[rolePath]
     except KeyError:
+        rolePath = re.sub(r'/+', '/', rolePath)
         rolePath = re.escape(rolePath).replace(r'\*\*', r'.*')
         rolePath = rolePath.replace(r'\*', r'[^/]*')
         rolePath += "$"

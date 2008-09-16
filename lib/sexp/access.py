@@ -36,6 +36,16 @@ def s_child(s, tag):
             return child
     return None
 
+def s_attr(s, tag):
+    """Returns the second element of the child of 's' whose tag is 'tag'.
+       This is helpful for extracting a (key val) element.  Returns None
+       if there is no such element.
+    """
+    ch = s_child(s,tag)
+    if ch == None or len(ch) < 2:
+        return None
+    return ch[1]
+
 def s_children(s, tag):
     """Returns a generator yielding all children of 's' whose tag is 'tag'.
 
