@@ -11,7 +11,6 @@ class EncodingTest(unittest.TestCase):
         self.assertEquals(1,1)
 
 
-
 def suite():
     import sexp.tests
     suite = unittest.TestSuite()

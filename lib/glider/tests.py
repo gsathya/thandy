@@ -4,14 +4,14 @@ import doctest
 
 import glider.keys
 import glider.formats
+import glider.repository
+
 import glider.tests
 
-class EncodingTest(unittest.TestCase):
-    def testQuotedString(self):
-        self.assertEquals(1,1)
+class EncryptionTest(unittest.TestCase):
+    pass
 
 def suite():
-    import sexp.tests
     suite = unittest.TestSuite()
 
     suite.addTest(doctest.DocTestSuite(glider.formats))

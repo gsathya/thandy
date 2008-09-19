@@ -48,6 +48,13 @@ def checkSignatures(signed, keyDB, role, path):
     unknownSigs = []
     tangentialSigs = []
 
+    assert signed[0] == "signed"
+    data = signed[1]
+
+    d_obj = Crypto.Hash.SHA256.new()
+    sexp.encode.hash_canonical(data, d_obj)
+    digest = d_obj.digest()
+
     for signature in sexp.access.s_children(signed, "signature"):
         attrs = signature[1]
         sig = attrs[2]
@@ -59,7 +66,7 @@ def checkSignatures(signed, keyDB, role, path):
             continue
         method = s_child(attrs, "method")[1]
         try:
-            result = key.checkSignature(method, data, sig)
+            result = key.checkSignature(method, sig, digest=digest)
         except UnknownMethod:
             continue
         if result == True:
@@ -74,6 +81,8 @@ def checkSignatures(signed, keyDB, role, path):
             goodSigs.append(keyid)
         else:
             badSigs.append(keyid)
+
+    return goodSigs, badSigs, unknownSigs, tangentialSigs
 
 def sign(signed, key):
     assert sexp.access.s_tag(signed) == 'signed'
@@ -129,7 +138,7 @@ SIGNED_TEMPLATE = r"""
 
 SIGNED_SCHEMA = _parseSchema(SIGNED_TEMPLATE, SCHEMA_TABLE)
 
-KEYFILE_TEMPLATE = r"""
+KEYLIST_TEMPLATE = r"""
  (=keylist
    (=ts .TIME)
    (=keys
@@ -139,7 +148,7 @@ KEYFILE_TEMPLATE = r"""
    *
  )"""
 
-KEYFILE_SCHEMA = _parseSchema(KEYFILE_TEMPLATE, SCHEMA_TABLE)
+KEYLIST_SCHEMA = _parseSchema(KEYLIST_TEMPLATE, SCHEMA_TABLE)
 
 MIRRORLIST_TEMPLATE = r"""
  (=mirrorlist
@@ -194,3 +203,74 @@ PACKAGE_TEMPLATE = r"""
 """
 
 PACKAGE_SCHEMA = _parseSchema(PACKAGE_TEMPLATE, SCHEMA_TABLE)
+
+ALL_ROLES = ('timestamp', 'mirrors', 'bundle', 'package', 'master')
+
+class Key:
+    def __init__(self, key, roles):
+        self.key = key
+        self.roles = []
+        for r,p in roles:
+            self.addRole(r,p)
+
+    def addRole(self, role, path):
+        assert role in ALL_ROLES
+        self.roles.append(role, path)
+
+    def getRoles(self):
+        return self.rules
+
+    @staticmethod
+    def fromSExpression(sexpr):
+        # must match PUBKEY_SCHEMA
+        typeattr = sexp.access.s_attr(sexpr[1], "type")
+        if typeattr == 'rsa':
+            key = glider.keys.RSAKey.fromSExpression(sexpr)
+            if key is not None:
+                return Key(key)
+        else:
+            return None
+
+    def format(self):
+        return self.key.format()
+
+    def getKeyID(self):
+        return self.key.getKeyID()
+
+    def sign(self, sexpr=None, digest=None):
+        return self.key.sign(sexpr, digest=digest)
+
+    def checkSignature(self, method, sexpr=None, digest=None):
+        if digest == None:
+            _, digest = self.key._digest(sexpr, method)
+        ok = self.key.checkSignature(method, digest=digest)
+        # XXXX CACHE HERE.
+        return ok
+
+class Keystore(KeyDB):
+    def __init__(self):
+        KeyDB.__init__(self)
+
+    @staticmethod
+    def addFromKeylist(sexpr, allowMasterKeys=False):
+        # Don't do this until we have validated the structure.
+        for ks in sexpr.access.s_lookup_all("keys.key"):
+            attrs = ks[1]
+            key_s = ks[2]
+            roles = s_attr(attrs, "roles")
+            #XXXX Use interface of Key, not RSAKey.
+            key = Key.fromSExpression(key_s)
+            if not key:
+                #LOG skipping key.
+                continue
+            for r,p in roles:
+                if r == 'master' and not allowMasterKeys:
+                    #LOG
+                    continue
+                if r not in ALL_ROLES:
+                    continue
+                key.addRole(r,p)
+
+            self.addKey(key)
+
+

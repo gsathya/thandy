@@ -5,9 +5,11 @@ o Write spec
 . Write server-side code (python)
   o S-expression lib
   . Code to manage data formats
+    . Parse
+    o Validate
   - Code to wrangle private keys
-    - Generate
-    - Store, load (password-protected)
+    o Generate
+    . Store, load (password-protected)
     - Print for posterity
 
   - Code to generate timestamp files

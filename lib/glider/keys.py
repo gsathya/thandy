@@ -2,13 +2,16 @@
 # These require PyCrypto.
 import Crypto.PublicKey.RSA
 import Crypto.Hash.SHA256
+import Crypto.Cipher.AES
 
 import sexp.access
 import sexp.encode
 import sexp.parse
 
+import cPickle as pickle
 import binascii
 import os
+import struct
 
 class CryptoError(Exception):
     pass
@@ -134,26 +137,147 @@ class RSAKey(PublicKey):
             self.keyid = ("rsa", d_obj.digest())
         return self.keyid
 
-    def sign(self, sexpr=None, digest=None):
-        assert _xor(sexpr == None, digest == None)
-        if digest == None:
+    def _digest(self, sexpr, method=None):
+        if method in (None, "sha256-pkcs1"):
             d_obj = Crypto.Hash.SHA256.new()
             sexp.encode.hash_canonical(sexpr, d_obj)
             digest = d_obj.digest()
+            return ("sha256-pkcs1", digest)
+
+        raise UnknownMethod(method)
+
+    def sign(self, sexpr=None, digest=None):
+        assert _xor(sexpr == None, digest == None)
+        if digest == None:
+            method, digest = self._digest(sexpr)
         m = _pkcs1_padding(digest, (self.key.size()+1) // 8)
         sig = intToBinary(self.key.sign(m, "")[0])
-        return ("sha256-pkcs1", sig)
+        return (method, sig)
 
     def checkSignature(self, method, sig, sexpr=None, digest=None):
         assert _xor(sexpr == None, digest == None)
         if method != "sha256-pkcs1":
             raise UnknownMethod("method")
         if digest == None:
-            d_obj = Crypto.Hash.SHA256.new()
-            sexp.encode.hash_canonical(sexpr, d_obj)
-            digest = d_obj.digest()
+            method, digest = self._digest(sexpr, method)
         sig = binaryToInt(sig)
         m = _pkcs1_padding(digest, (self.key.size()+1) // 8)
         return self.key.verify(m, (sig,))
 
+SALTLEN=16
+
+def secretToKey(salt, secret):
+    """Convert 'secret' to a 32-byte key, using a version of the algorithm
+       from RFC2440.  The salt must be SALTLEN+1 bytes long, and should
+       be random, except for the last byte, which encodes how time-
+       consuming the computation should be.
+
+       (The goal is to make offline password-guessing attacks harder by
+       increasing the time required to convert a password to a key, and to
+       make precomputed password tables impossible to generate by )
+    """
+    assert len(salt) == SALTLEN+1
+
+    # The algorithm is basically, 'call the last byte of the salt the
+    # "difficulty", and all other bytes of the salt S.  Now make
+    # an infinite stream of S|secret|S|secret|..., and hash the
+    # first N bytes of that, where N is determined by the difficulty.
+    #
+    # Obviously, this wants a hash algorithm that's tricky to
+    # parallelize.
+    #
+    # Unlike RFC2440, we use a 16-byte salt.  Because CPU times
+    # have improved, we start at 16 times the previous minimum.
+
+    difficulty = ord(salt[-1])
+    count = (16L+(difficulty & 15)) << ((difficulty >> 4) + 10)
+
+    # Make 'data' nice and long, so that we don't need to call update()
+    # a zillion times.
+    data = salt[:-1]+secret
+    if len(data)<1024:
+        data *= (1024 // len(data))+1
+
+    d = Crypto.Hash.SHA256.new()
+    iters, leftover = divmod(count, len(data))
+    for _ in xrange(iters):
+        d.update(data)
+        #count -= len(data)
+    if leftover:
+        d.update(data[:leftover])
+        #count -= leftover
+    #assert count == 0
+
+    return d.digest()
+
+def encryptSecret(secret, password, difficulty=0x80):
+    """Encrypt the secret 'secret' using the password 'password',
+       and return the encrypted result."""
+    # The encrypted format is:
+    #    "GKEY1"  -- 5 octets, fixed, denotes data format.
+    #    SALT     -- 17 bytes, used to hash password
+    #    IV       -- 16 bytes; salt for encryption
+    #    ENCRYPTED IN AES256-OFB, using a key=s2k(password, salt) and IV=IV:
+    #       SLEN   -- 4 bytes; length of secret, big-endian.
+    #       SECRET -- len(secret) bytes
+    #       D      -- 32 bytes; SHA256 hash of (salt|secret|salt).
+    #
+    # This format leaks the secret length, obviously.
+    assert 0 <= difficulty < 256
+    salt = os.urandom(SALTLEN)+chr(difficulty)
+    key = secretToKey(salt, password)
+
+    d_obj = Crypto.Hash.SHA256.new()
+    d_obj.update(salt)
+    d_obj.update(secret)
+    d_obj.update(salt)
+    d = d_obj.digest()
+
+    iv = os.urandom(16)
+    e = Crypto.Cipher.AES.new(key, Crypto.Cipher.AES.MODE_OFB, iv)
+
+    # Stupidly, pycrypto doesn't accept that stream ciphers don't need to
+    # take their input in blocks.  So pad it, then ignore the padded output.
+
+    padlen = 16-((len(secret)+len(d)+4) % 16)
+    if padlen == 16: padlen = 0
+    pad = '\x00' * padlen
+
+    slen = struct.pack("!L",len(secret))
+    encrypted = e.encrypt("%s%s%s%s" % (slen, secret, d, pad))[:-padlen]
+    return "GKEY1%s%s%s"%(salt, iv, encrypted)
+
+def decryptSecret(encrypted, password):
+    if encrypted[:5] != "GKEY1":
+        raise UnknownFormat()
+    encrypted = encrypted[5:]
+    if len(encrypted) < SALTLEN+1+16:
+        raise FormatError()
+
+    salt = encrypted[:SALTLEN+1]
+    iv = encrypted[SALTLEN+1:SALTLEN+1+16]
+    encrypted = encrypted[SALTLEN+1+16:]
+
+    key = secretToKey(salt, password)
+
+    e = Crypto.Cipher.AES.new(key, Crypto.Cipher.AES.MODE_OFB, iv)
+    padlen = 16-(len(encrypted) % 16)
+    if padlen == 16: padlen = 0
+    pad = '\x00' * padlen
+
+    decrypted = e.decrypt("%s%s"%(encrypted,pad))
+    slen = struct.unpack("!L", decrypted[:4])[0]
+    secret = decrypted[4:4+slen]
+    hash = decrypted[4+slen:4+slen+Crypto.Hash.SHA256.digest_size]
+
+    d = Crypto.Hash.SHA256.new()
+    d.update(salt)
+    d.update(secret)
+    d.update(salt)
+
+    if d.digest() != hash:
+        print repr(decrypted)
+        raise BadPassword()
+
+    return secret
 

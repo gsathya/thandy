@@ -97,6 +97,21 @@ def s_descendants(s, tags=()):
         s = s[idx]
         idx = 0
 
+def attrs_to_dict(sexpr):
+    """Return a dictionary mapping keys of the attributes in sexpr to
+       their values.  Only the last element in the attribute list counts.
+
+    >>> s = [ 'given-name',
+    ...      ["Tigra", 'Rachel'], ["Bunny", "Elana"] ]
+    >>> attrs_to_dict(s)
+    {'Tigra': ['Rachel'], 'Bunny': ['Elana']}
+    """
+    result = {}
+    for ch in sexpr:
+        tag = s_tag(ch)
+        if tag is not None:
+            result[tag]=ch[1:]
+    return result
 
 class SExpr(list):
     """Wraps an s-expresion list to return its tagged children as attributes.
@@ -177,9 +192,9 @@ def _s_lookup_all(s, path, callback):
                 if s_tag(ch) == p_item[2:]:
                     _s_lookup_all(ch, path[p_idx+1:], callback)
         else:
-            s = s_child(s, p_item)
-            if s is None:
-                return
+            for ch in s_children(s, p_item):
+                _s_lookup_all(ch, path[p_idx+1:], callback)
+            return
 
     callback(s)
 
@@ -190,7 +205,9 @@ def s_lookup_all(s, path):
     >>> x = ['alice',
     ...           ['father', 'bob', ['mother', 'carol'], ['father', 'dave']],
     ...           ['mother', 'eve', ['mother', 'frances', ['dog', 'spot']],
-    ...                             ['father', 'gill']]]
+    ...                             ['father', 'gill']],
+    ...           ['marmoset', 'tiffany'],
+    ...           ['marmoset', 'gilbert']  ]
     >>> s_lookup_all(x, "father")
     [['father', 'bob', ['mother', 'carol'], ['father', 'dave']]]
     >>> s_lookup_all(x, "father.mother")
@@ -203,6 +220,8 @@ def s_lookup_all(s, path):
     [['dog', 'spot']]
     >>> s_lookup_all(x, "mother.*.dog")
     [['dog', 'spot']]
+    >>> s_lookup_all(x, "marmoset")
+    [['marmoset', 'tiffany'], ['marmoset', 'gilbert']]
     """
     result = []
     _s_lookup_all(s, path, result.append)
