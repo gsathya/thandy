@@ -354,11 +354,13 @@ class KeyStore(thandy.formats.KeyDB):
         if self._passwd != None:
             return self._passwd
         while 1:
-            pwd = getpass.getpass("Password: ", sys.stderr)
+            sys.stderr.write("Password: ")
+            pwd = getpass.getpass("")
             if not reprompt:
                 return pwd
 
-            pwd2 = getpass.getpass("Confirm: ", sys.stderr)
+            sys.stderr.write("Confirm: ")
+            pwd2 = getpass.getpass("")
             if pwd == pwd2:
                 return pwd
             else:
