@@ -78,7 +78,8 @@ paths in the repository.  Example roles are:
     thandy-pk addrole {KEYID} bundle '/bundleinfo/**'
 
 In these path patterns, "*" matches any sequence of characters in a filename,
-and "**" matches any sequence of characters in a 
+and "**" matches any directory sequence of characters in a path.  For
+example, /a/**.txt  matches /a/nested/file.txt, but a/*.txt does not.
 
 You can refer to a key by any unique prefix of its keyid.  For example, the
 key "iCMQHVDpetbB3DLWVOd0k5RBOVKF92rD4F8YpuYWEpA" could be called "iC",
