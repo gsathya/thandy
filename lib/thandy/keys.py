@@ -32,8 +32,8 @@ class PublicKey:
     def getKeyID(self):
         raise NotImplemented()
     def getRoles(self):
-        """Remove a list of all roles supported by this key.  A role is
-           from this key.  A role is a doctype,pathPattern tuple.
+        """Return a list of all roles supported by this key.  A role is
+           a doctype,pathPattern tuple.
         """
         return self._roles
     def addRole(self, role, path):
@@ -172,7 +172,7 @@ class RSAKey(PublicKey):
         return hasattr(self.key, 'd')
 
     def format(self, private=False, includeRoles=False):
-        """Returna a new object to represent this key in json format.
+        """Return a new object to represent this key in json format.
            If 'private', include private-key data.  If 'includeRoles',
            include role information.
         """
