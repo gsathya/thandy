@@ -1,0 +1,232 @@
+Getting started with Thandy: the Hacker's version.
+
+INSTALLATION
+------------
+
+1) Make sure you have Python installed.  Thandy has been tested with Python
+   2.5.  It may need tweaks to work with other versinos.
+
+2) Install the simplejson python module.
+
+3) Install the pycrypto python module.
+
+4) make test
+
+5) make install
+
+   [If you don't have root, or don't want to put it in the usual places,
+        python setup.py install --prefix={WHATEVER}
+    to put the files into whatever/bin and whatever/lib instead of
+    the defaults.]
+
+PRELIMINARIES
+-------------
+
+Read enough of thandy-spec.txt to understand the model of packages and
+bundles and keys and repositories.  Here's a quick synopsis:
+
+   A 'Package' is a file that the client actually installs.  It's the
+   smallest unit of downloadable thing.  It's versioned.  It's signed by a
+   "package signer".
+
+   A 'Bundle' is a set of files that get installed and upgraded together.
+   Users "subscribe" to bundles.
+
+   [XXXX write more]
+
+WORKING WITH KEYS
+-----------------
+
+The "thandy-pk" script can generate, manipulate, and use public keys.  If
+you're a packager, bundler, or whatever, this is the script you use.
+
+To make a key, run:
+
+    thandy-pk keygen
+
+The first time you run it, it will ask you for a password to encrypt the
+keys in ~/.thandy/secret_keys.  If you don't like the password on your
+~/.thandy/secret_keys file, run:
+
+    thandy-pk chpass
+
+You can have more than one key.  Keys are identified by their base-64 keyids.
+To see all the keys you have, run:
+
+    thandy-pk listkeys
+
+To make a key useful, you need to assign it one or more roles.  A role is
+a permission for a key to sign a certain kind of file at a certain set of
+paths in the repository.  Example roles are:
+
+    # Give a key permission to sign the list of keys.
+    thandy-pk addrole {KEYID} master /meta/keys.txt
+
+    # Give a key permission to sign the mirror list
+    thandy-pk addrole {KEYID} mirrors /meta/mirrors.txt
+
+    # Give a key permission to sign the mirror list
+    thandy-pk addrole {KEYID} timestamp /meta/timestamp.txt
+
+    # Give a key permission to sign all packages in /pkginfo/tor/win32/*.txt
+    thandy-pk addrole {KEYID} package '/pkginfo/tor/win32/*.txt'
+
+    # Give a key permission to sign all bundles anywhere under /bundleinfo/
+    thandy-pk addrole {KEYID} bundle '/bundleinfo/**'
+
+In these path patterns, "*" matches any sequence of characters in a filename,
+and "**" matches any sequence of characters in a 
+
+You can refer to a key by any unique prefix of its keyid.  For example, the
+key "iCMQHVDpetbB3DLWVOd0k5RBOVKF92rD4F8YpuYWEpA" could be called "iC",
+so long as there is no other key in ~/.thandy/secret_keys that starts with iC.
+
+To remove a role from a key, run:
+
+    thandy-pk delrole {KEYID} {filetype} {path}
+
+To export the public parts of a key and its roles, run:
+
+    thandy-pk dumpkey {KEYID}
+
+To include the private portions of a key (so you can print it for a backup
+or something, run:
+
+    thandy-pk dumpkey --include-secret {KEYID}
+
+Generally speaking, you want to figure out what keys get what roles _before_
+you start making the first keylist; otherwise you'll probably need to
+re-export them.
+
+MAKING SIGNED DOCUMENTS
+-----------------------
+
+.KEYLISTS.
+
+Let's start with a key list.  To make one of these, have everybody with a
+valid key dump it for you (using thandy-pk dumpkey) and put all their keys
+into a file.  Then run:
+
+   thandy-pk makekeylist {FILENAME}
+
+This will create a new keylist in a file called "keys.txt".
+
+To sign any document, you need to have a key with an appropriate role set, so
+if you don't have a key with a role like "master /meta/keys.txt", this
+command might fail.  If there's more than one matching key, you need to
+specify which one you wanted by adding a --keyid argument, like:
+
+   thandy-pk makekeylist --keyid={KEYID} {FILENAME}
+
+Keylists can be multiply-signed.  To add your own signature to an existing
+keylist, run:
+
+   thandy-pk signkeylist {FILENAME}
+
+This will make a new keylist in "keys.txt".
+
+
+.MIRROR LISTS.
+
+Make a file like the one in sample/example-mirrors.txt, listing all the
+mirrors.  Make sure you have a key with a role like "mirrors
+/meta/mirrors.txt".  Run
+
+   thandy-pk makemirrorlist {FILENAME}
+
+This will create a new signed mirrors.txt file.
+
+.PACKAGES.
+
+Make a file like the one in sample/example-package.cfg to go along with some
+RPM or EXE or whatever that you want to sign.  Make sure that the "location"
+field for the pkginfo describes where you want to put it.  Make sure you have
+some key with the role "package {PATH}", where {PATH} matches the location of
+the pkginfo.
+
+Then run:
+
+   thandy-pk makepackage {PACKAGE.CFG} {UNDERLYING_FILE}
+
+This makes a new signed package info file.
+
+.BUNDLES.
+
+Make sure you have all the package files for the right versions of the
+packages that go in your bundle.  Make a file like the one in
+sample/example-bundle.cfg.  Then run:
+
+   thandy-pk makebundle {BUNDLE.CFG} {PACKAGE_INFO} {PACKAGE_INFO}....
+
+This makes a new signed bundle.
+
+
+MANAGING A SERVER REPOSITORY
+----------------------------
+
+First, decide where the repository goes.  It should probably be somewhere
+that your httpd will notice it and serve it to people.
+
+You'll use the thandy-server command to manipulate the repository.  To tell
+it where it is, you can either use the command-line option
+--repo={REPOSITORY}, or set the environment variable THANDY_MASTER_REPO.
+I'll assume you've done the latter, since it makes my examples shorter.
+
+.ADDING FILES TO THE REPOSITORY.
+
+First, make sure that Thandy knows about your master keys.  For clients,
+we'll want to ship a special binary that's preconfigured to know about the
+master keys, but for the server admin, just put those public master keys (in
+dumped format) into the file "~/.thandy/preload_keys".
+
+Then, you can just add files by running:
+
+    thandy-server insert {FILENAME}
+
+This works for keylists, packages, mirrorlists, and bundles.  A few caveats
+and notes:
+
+    * When you add a new package, you'll need to put its underlying files
+      in the right places too.
+
+    * By default, thandy-server will refuse to insert any file that isn't
+      properly signed.  This means that you need to insert the keys.txt file
+      before you insert anything else.  To override this, use the --no-check
+      option.
+
+    * All files that you replace are actually moved to ~/.thandy/old_files,
+
+    * You should probably rebuild the timestamp immediately after replacing
+      the keys or mirrors files, since it will no longer match them.
+
+.GENERATING TIMESTAMPS.
+
+This is the only part of Thandy that needs to be run periodically, and the
+only part that needs automated access to a secret key.
+
+Export a key with a role like "timestamp /meta/timestamp.txt".  Since this
+key will get used to sign the timestamp, you need to dump the secret part of
+the key too.  Put the exported key in "~/.thandy/timestamp_key".
+
+To generate a timestamp, run
+
+    thandy-server timestamp
+
+If you're running a repository, you should have this in a crontab file,
+sat to run periodically.  Every 10-60 minutes would be fine, depending on
+your clients' settings.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

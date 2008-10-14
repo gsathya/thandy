@@ -1,4 +1,23 @@
 
+# Example mirror configuration file.
+#
+# Add a "Mirror" command like this for every mirror that you want to list.
+#
+# The "name" is a helpful name of the mirror.
+#
+# The "urlbase" is the top-level of this mirror's copy of the repository.
+# For example, if urlbase is http://foo.bar/baz/, then Thandy will expect
+# to find the keylist at http://foo.bar/baz/meta/keys.txt.
+#
+# The "contents" list should contain a list of file paths patterns for
+# which parts of the repository can be found at this mirror.  For example,
+# if this list is [ "/meta/*", "/pkginfo/tor/**" ], then this mirror
+# keeps up-to-date copies of all files in /meta/, and all files in any
+# subdirectory of "/pkginfo/tor".
+#
+# The "weight" field is an INTEGER representing the relative weight with which
+# we should pick this mirror.
+
 Mirror(name="moria",
        urlbase="http://moria.seul.org/thandy-example/",
        contents=[ "**" ],

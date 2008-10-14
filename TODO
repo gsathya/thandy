@@ -43,10 +43,10 @@ o Repository code.
 
 - Wrapping
   - More unit tests
-  - Setup.py script to install everything
+  o Setup.py script to install everything
 
-- Documentation
-  - HOWTO guides
+. Documentation
+  o HOWTO guides
   . full pydoc
   - revise spec
 
