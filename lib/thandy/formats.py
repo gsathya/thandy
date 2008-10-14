@@ -628,11 +628,11 @@ def makePackageObj(config_fname, package_fname):
 
     return result
 
-def makeBundleObj(config_fname, getPackageHash):
+def makeBundleObj(config_fname, getPackage):
     packages = []
     def ShortGloss(lang, val): packages[-1]['gloss'][lang] = val
     def LongGloss(lang, val): packages[-1]['longgloss'][lang] = val
-    def Package(name, version, path, order, optional=False):
+    def Package(name, order, version=None, path=None, optional=False):
         packages.append({'name' : name,
                          'version' : version,
                          'path' : path,
@@ -661,7 +661,17 @@ def makeBundleObj(config_fname, getPackageHash):
 
     for p in packages:
         try:
-            p['hash'] = formatHash(getPackageHash(p['path']))
+            pkginfo = getPackage(p['name'])
+        except KeyError:
+            raise thandy.FormatException("No such package as %s"%p['name'])
+
+        p['hash'] = formatHash(getDigest(pkginfo))
+        if p['path'] == None:
+            p['path'] = pkginfo['location']
+        if p['version'] == None:
+            p['version'] = pkginfo['version']
+        if p['
+
         except KeyError:
             raise thandy.FormatException("No such package as %s"%p['path'])
 

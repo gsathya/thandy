@@ -98,13 +98,9 @@ def makebundle(args):
         _, r, _ = thandy.formats.checkSignedObj(p)
         if r != 'package':
             print pkgFile, "was not a package"
-        packages[p['signed']['location']] = p
+        packages[p['signed']['name']] = p['signed']
 
-    def getHash(path):
-        p = packages[path]
-        return thandy.formats.getDigest(p['signed'])
-
-    bundleObj = thandy.formats.makeBundleObj(configFile, getHash)
+    bundleObj = thandy.formats.makeBundleObj(configFile, packages.__getitem__)
     signable = thandy.formats.makeSignable(bundleObj)
 
     ks = getKeyStore()
@@ -224,7 +220,7 @@ def addrole(args):
     r = args[1]
     if r not in thandy.formats.ALL_ROLES:
         print "Unrecognized role %r.  Known roles are %s"%(
-            r,", ".join(thandy.format.ALL_ROLES))
+            r,", ".join(thandy.formats.ALL_ROLES))
         sys.exit(1)
     p = args[2]
     k.addRole(r, p)
@@ -239,7 +235,7 @@ def delrole(args):
     r = args[1]
     if r not in thandy.formats.ALL_ROLES:
         print "Unrecognized role %r.  Known roles are %s"%(
-            r,", ".join(thandy.format.ALL_ROLES))
+            r,", ".join(thandy.formats.ALL_ROLES))
         sys.exit(1)
     p = args[2]
 
