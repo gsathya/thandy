@@ -7,8 +7,11 @@ INSTALLATION
    2.5.  It may need tweaks to work with other versinos.
 
 2) Install the simplejson python module.
+   (on Debian, apt-get install python-simplejson. If you're using etch,
+    you'll want apt-get -t etch-backports install python-simplejson)
 
 3) Install the pycrypto python module.
+   (on Debian, apt-get install python-crypto)
 
 4) make test
 
