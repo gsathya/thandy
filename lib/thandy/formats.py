@@ -5,7 +5,7 @@ import re
 import binascii
 import calendar
 
-import glider.checkJson
+import thandy.checkJson
 
 import Crypto.Hash.SHA256
 
@@ -134,7 +134,7 @@ def checkSignatures(signed, keyDB, role=None, path=None):
 
         try:
             result = key.checkSignature(method, sig, digest=digest)
-        except glider.UnknownMethod:
+        except thandy.UnknownMethod:
             continue
 
         if result == True:
@@ -276,7 +276,7 @@ def parseTime(s):
     try:
         return calendar.timegm(time.strptime(s, "%Y-%m-%d %H:%M:%S"))
     except ValueError:
-        raise glider.FormatError("Malformed time %r", s)
+        raise thandy.FormatError("Malformed time %r", s)
 
 def formatBase64(h):
     """Return the base64 encoding of h with whitespace and = signs omitted."""
@@ -293,15 +293,15 @@ def parseBase64(s):
     try:
         return binascii.a2b_base64(s)
     except binascii.Error:
-        raise glider.FormatError("Invalid base64 encoding")
+        raise thandy.FormatError("Invalid base64 encoding")
 
 def parseHash(s):
     h = parseBase64(s)
     if len(h) != Crypto.Hash.SHA256.digest_size:
-        raise glider.FormatError("Bad hash length")
+        raise thandy.FormatError("Bad hash length")
     return h
 
-S = glider.checkJson
+S = thandy.checkJson
 
 # A date, in YYYY-MM-DD HH:MM:SS format.
 TIME_SCHEMA = S.RE(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}')
@@ -425,10 +425,10 @@ class Key:
         # must match PUBKEY_SCHEMA
         keytype = obj['_keytype']
         if keytype == 'rsa':
-            return Key(glider.keys.RSAKey.fromJSon(obj))
+            return Key(thandy.keys.RSAKey.fromJSon(obj))
 
         if typeattr == 'rsa':
-            key = glider.keys.RSAKey.fromSExpression(sexpr)
+            key = thandy.keys.RSAKey.fromSExpression(sexpr)
             if key is not None:
                 return Key(key)
         else:
@@ -458,8 +458,8 @@ class Keylist(KeyDB):
             roles = keyitem['roles']
 
             try:
-                key = glider.keys.RSAKey.fromJSon(key)
-            except glider.FormatException, e:
+                key = thandy.keys.RSAKey.fromJSon(key)
+            except thandy.FormatException, e:
                 print e
                 #LOG skipping key.
                 continue
@@ -537,7 +537,7 @@ def readConfigFile(fname, needKeys=(), optKeys=(), preload={}):
         try:
             result[k] = parsed[k]
         except KeyError:
-            raise glider.FormatError("Missing value for %s in %s"%k,fname)
+            raise thandy.FormatError("Missing value for %s in %s"%k,fname)
 
     for k in optKeys:
         try:
@@ -616,7 +616,7 @@ def makeBundleObj(config_fname, getPackageHash):
         try:
             p['hash'] = formatHash(getPackageHash(p['path']))
         except KeyError:
-            raise glider.FormatException("No such package as %s"%p['path'])
+            raise thandy.FormatException("No such package as %s"%p['path'])
 
     BUNDLE_SCHEMA.checkMatch(result)
     return result
@@ -689,7 +689,7 @@ def makeKeylistObj(keylist_fname, includePrivate=False):
 
     klist = []
     for k in keys:
-        k = glider.keys.RSAKey.fromJSon(k)
+        k = thandy.keys.RSAKey.fromJSon(k)
         klist.append({'key': k.format(private=includePrivate), 'roles' : k.getRoles() })
 
     result = { '_type' : "Keylist",
@@ -714,11 +714,11 @@ def checkSignedObj(obj, keydb=None):
     try:
         tp = obj['signed']['_type']
     except KeyError:
-        raise glider.FormatException("Untyped object")
+        raise thandy.FormatException("Untyped object")
     try:
         schema = SCHEMAS_BY_TYPE[tp]
     except KeyError:
-        raise glider.FormatException("Unrecognized type %r" % tp)
+        raise thandy.FormatException("Unrecognized type %r" % tp)
     schema.checkMatch(obj['signed'])
 
     if tp == 'Keylist':

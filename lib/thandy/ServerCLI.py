@@ -6,9 +6,9 @@ import time
 
 import simplejson
 
-import glider.formats
-import glider.util
-import glider.keys
+import thandy.formats
+import thandy.util
+import thandy.keys
 
 def tstamp():
     return time.strftime("%Y%m%d_%H%M%S", time.localtime())
@@ -29,7 +29,7 @@ def snarfObj(fname):
 
 def insert(args):
     repo = os.environ.get("THANDY_MASTER_REPO")
-    backupDir = glider.util.userFilename("old_files")
+    backupDir = thandy.util.userFilename("old_files")
     checkSigs = True
 
     options, args = getopt.getopt(args, "", ["repo=", "no-check"])
@@ -50,7 +50,7 @@ def insert(args):
         os.makedirs(backupDir, 0700)
 
     if checkSigs:
-        keys = glider.util.getKeylist(os.path.join(repo, "meta/keys.txt"))
+        keys = thandy.util.getKeylist(os.path.join(repo, "meta/keys.txt"))
     else:
         keys = None
 
@@ -70,8 +70,8 @@ def insert(args):
             continue
 
         try:
-            ss, r, path = glider.formats.checkSignedObj(obj, keys)
-        except glider.FormatException, e:
+            ss, r, path = thandy.formats.checkSignedObj(obj, keys)
+        except thandy.FormatException, e:
             print "Bad format on %s: %s"%(fn, e)
             continue
         if checkSigs and not ss.isValid():
@@ -91,14 +91,14 @@ def insert(args):
             baseFname = "%s_%s" % (tstamp(), os.path.split(path)[1])
             backupFname = os.path.join(backupDir, baseFname)
             print "  Copying old file to %s"%backupFname
-            glider.util.replaceFile(backupFname, oldContents)
+            thandy.util.replaceFile(backupFname, oldContents)
 
         parentDir = os.path.split(targetPath)[0]
         if not os.path.exists(parentDir):
             print "  Making %s"%parentDir
             os.makedirs(parentDir, 0755)
         print "  Replacing file..."
-        glider.util.replaceFile(targetPath, content)
+        thandy.util.replaceFile(targetPath, content)
         print "  Done."
         n_ok += 1
     if n_ok != len(args):
@@ -106,7 +106,7 @@ def insert(args):
 
 def timestamp(args):
     repo = os.environ.get("THANDY_MASTER_REPO")
-    ts_keyfile = glider.util.userFilename("timestamp_key")
+    ts_keyfile = thandy.util.userFilename("timestamp_key")
 
     options, args = getopt.getopt(args, "", ["repo=", "ts-key="])
     for o,v in options:
@@ -144,8 +144,8 @@ def timestamp(args):
                 print "(Couldn't read bundle-like %s)"%fn
                 continue
             try:
-                _, r, _ = glider.formats.checkSignedObj(bObj)
-            except glider.FormatException, e:
+                _, r, _ = thandy.formats.checkSignedObj(bObj)
+            except thandy.FormatException, e:
                 print "Problem reading object from %s"%fn
                 continue
             if r != "bundle":
@@ -153,19 +153,19 @@ def timestamp(args):
                 continue
             bundles.append(bObj['signed'])
 
-    timestamp = glider.formats.makeTimestampObj(
+    timestamp = thandy.formats.makeTimestampObj(
         mObj['signed'], kObj['signed'], bundles)
-    signable = glider.formats.makeSignable(timestamp)
+    signable = thandy.formats.makeSignable(timestamp)
 
-    keydb = glider.formats.Keylist()
+    keydb = thandy.formats.Keylist()
     #XXXX Still a roundabout way to do this.
-    keylist = glider.formats.makeKeylistObj(ts_keyfile, True)
+    keylist = thandy.formats.makeKeylistObj(ts_keyfile, True)
     keydb.addFromKeylist(keylist)
     for k in keydb.iterkeys():
-        glider.formats.sign(signable, k)
+        thandy.formats.sign(signable, k)
 
     content = simplejson.dumps(signable, sort_keys=True)
-    glider.util.replaceFile(tsFname, content)
+    thandy.util.replaceFile(tsFname, content)
 
 def usage():
     print "Known commands:"

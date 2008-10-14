@@ -5,9 +5,9 @@ import tempfile
 
 import simplejson
 
-import glider.formats
-import glider.keys
-import glider.master_keys
+import thandy.formats
+import thandy.keys
+import thandy.master_keys
 
 def moveFile(fromLocation, toLocation):
     if sys.platform in ('cygwin', 'win32'):
@@ -43,17 +43,17 @@ def userFilename(name):
     return os.path.join(base, name)
 
 def getKeylist(keys_fname, checkKeys=True):
-    import glider.master_keys
+    import thandy.master_keys
 
-    keydb = glider.formats.Keylist()
+    keydb = thandy.formats.Keylist()
 
-    for key in glider.master_keys.MASTER_KEYS:
+    for key in thandy.master_keys.MASTER_KEYS:
         keydb.addKey(key)
 
     user_keys = userFilename("preload_keys")
     if os.path.exists(user_keys):
         #XXXX somewhat roundabout.
-        keylist = glider.formats.makeKeylistObj(user_keys)
+        keylist = thandy.formats.makeKeylistObj(user_keys)
         keydb.addFromKeylist(keylist, allowMasterKeys=True)
 
     if keys_fname and os.path.exists(keys_fname):
@@ -62,11 +62,11 @@ def getKeylist(keys_fname, checkKeys=True):
             obj = simplejson.load(f)
         finally:
             f.close()
-        ss, role, path = glider.formats.checkSignedObj(obj, keydb)
+        ss, role, path = thandy.formats.checkSignedObj(obj, keydb)
         if role != 'master':
-            raise glider.FormatException("%s wasn't a keylist."%keys_fname)
+            raise thandy.FormatException("%s wasn't a keylist."%keys_fname)
         if checkKeys and not ss.isValid():
-            raise glider.FormatException("%s not signed by enough master keys"%
+            raise thandy.FormatException("%s not signed by enough master keys"%
                                          keys_fname)
         keydb.addFromKeylist(obj['signed'], allowMasterKeys=False)
 

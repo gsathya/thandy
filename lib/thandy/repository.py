@@ -1,6 +1,6 @@
 
-import glider.formats
-import glider.util
+import thandy.formats
+import thandy.util
 
 import simplejson
 import logging
@@ -60,7 +60,7 @@ class RepositoryFile:
         signed_obj,main_obj = self._checkContent(content)
 
         fname = self.getPath()
-        glider.util.replaceFile(fname, contents)
+        thandy.util.replaceFile(fname, contents)
 
         self._signed_obj = signed_obj
         self._main_obj = main_obj
@@ -71,11 +71,11 @@ class RepositoryFile:
         try:
             obj = simplejson.loads(content)
         except ValueError, e:
-            raise glider.FormatException("Couldn't decode content: %s"%e)
+            raise thandy.FormatException("Couldn't decode content: %s"%e)
 
         if self._signedFormat:
             # This is supposed to be signed.
-            glider.formats.SIGNED_SCHEMA.checkMatch(obj)
+            thandy.formats.SIGNED_SCHEMA.checkMatch(obj)
 
             main_obj = obj['signed']
             signed_obj = obj
@@ -104,7 +104,7 @@ class RepositoryFile:
 
     def _checkSignatures(self):
         self.load()
-        sigStatus = glider.formats.checkSignatures(self._signed_obj,
+        sigStatus = thandy.formats.checkSignatures(self._signed_obj,
                                      self._repository._keyDB,
                                      self._needRole, self._relativePath)
         self._sigStatus = sigStatus
@@ -117,16 +117,16 @@ class RepositoryFile:
 class LocalRepository:
     def __init__(self, root):
         self._root = root
-        self._keyDB = glider.util.getKeylist(None)
+        self._keyDB = thandy.util.getKeylist(None)
 
         self._keylistFile = RepositoryFile(
-            self, "/meta/keys.txt", glider.formats.KEYLIST_SCHEMA,
+            self, "/meta/keys.txt", thandy.formats.KEYLIST_SCHEMA,
             needRole="master")
         self._timestampFile = RepositoryFile(
-            self, "/meta/timestamp.txt", glider.formats.TIMESTAMP_SCHEMA,
+            self, "/meta/timestamp.txt", thandy.formats.TIMESTAMP_SCHEMA,
             needRole="timestamp")
         self._mirrorlistFile = RepositoryFile(
-            self, "/meta/mirrors.txt", glider.formats.MIRRORLIST_SCHEMA,
+            self, "/meta/mirrors.txt", thandy.formats.MIRRORLIST_SCHEMA,
             needRole="mirrors")
         self._metaFiles = [ self._keylistFile,
                             self._timestampFile,
@@ -154,7 +154,7 @@ class LocalRepository:
             return self._packageFiles[relPath]
         except KeyError:
             self._packageFiles[relPath] = pkg = RepositoryFile(
-                self, relPath, glider.formats.PACKAGE_SCHEMA,
+                self, relPath, thandy.formats.PACKAGE_SCHEMA,
                 needRole='package')
             return pkg
 
@@ -163,7 +163,7 @@ class LocalRepository:
             return self._bundleFiles[relPath]
         except KeyError:
             self._bundleFiles[relPath] = pkg = RepositoryFile(
-                self, relPath, glider.formats.BUNDLE_SCHEMA,
+                self, relPath, thandy.formats.BUNDLE_SCHEMA,
                 needRole='bundle')
             return pkg
 
@@ -188,8 +188,8 @@ class LocalRepository:
         # be good.)
         ts = self._timestampFile.get()
         if ts:
-            age = now - glider.formats.parseTime(ts['at'])
-            ts = glider.formats.TimestampFile.fromJSon(ts)
+            age = now - thandy.formats.parseTime(ts['at'])
+            ts = thandy.formats.TimestampFile.fromJSon(ts)
             if age > MAX_TIMESTAMP_AGE:
                 need.add(self._timestampFile.getRelativePath())
 
@@ -217,7 +217,7 @@ class LocalRepository:
         # FINALLY, we know we have an up-to-date, signed timestamp
         # file.  Check whether the keys and mirrors file are as
         # authenticated.
-        h_kf = glider.formats.getDigest(self._keylistFile.get())
+        h_kf = thandy.formats.getDigest(self._keylistFile.get())
         h_expected = ts.getKeylistInfo().getHash()
         if h_kf != h_expected:
             need.add(self._keylistFile.getRelativePath())
@@ -229,7 +229,7 @@ class LocalRepository:
         if not s.isValid():
             need.add(self._mirrorlistFile.getRelativePath())
 
-        h_mf = glider.formats.getDigest(self._mirrorlistFile.get())
+        h_mf = thandy.formats.getDigest(self._mirrorlistFile.get())
         h_expected = ts.getMirrorlistInfo().getHash()
         if h_mf != h_expected:
             need.add(self._mirrorlistFile.getRelativePath())
@@ -255,7 +255,7 @@ class LocalRepository:
                 need.add(rp)
                 continue
 
-            h_b = glider.formats.getDigest(bfile.get())
+            h_b = thandy.formats.getDigest(bfile.get())
             h_expected = binfo.getHash()
             if h_b != h_expected:
                 need.add(rp)
@@ -281,8 +281,8 @@ class LocalRepository:
                     need.add(rp)
                     continue
 
-                h_p = glider.formats.getDigest(pfile.get())
-                h_expected = glider.formats.parseHash(pkginfo['hash'])
+                h_p = thandy.formats.getDigest(pfile.get())
+                h_expected = thandy.formats.parseHash(pkginfo['hash'])
                 if h_p != h_expected:
                     need.add(rp)
                     continue
@@ -299,10 +299,10 @@ class LocalRepository:
             package = pfile.get()
             for f in package['files']:
                 rp, h = f[:2]
-                h_expected = glider.formats.parseHash(h)
+                h_expected = thandy.formats.parseHash(h)
                 fn = self.getFilename(rp)
                 try:
-                    h_got = glider.formats.getFileDigest(fn)
+                    h_got = thandy.formats.getFileDigest(fn)
                 except OSError:
                     need.add(rp)
                     continue

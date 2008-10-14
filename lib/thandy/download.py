@@ -6,7 +6,7 @@ import random
 
 import threading, Queue
 
-import glider.util
+import thandy.util
 
 class Downloads:
     def __init__(self, n_threads=2):
@@ -64,7 +64,7 @@ class DownloadJob:
         self._mirrorList = mirrorlist
         self._destPath = destPath
 
-        tmppath = glider.util.userFilename("tmp")
+        tmppath = thandy.util.userFilename("tmp")
         if relPath.startswith("/"):
             relPath = relPath[1:]
         self._tmppath = os.path.join(tmppath, relPath)
@@ -89,7 +89,7 @@ class DownloadJob:
             for c in m['contents']:
                 # CHECK FOR URL SUITABILITY XXXXX
 
-                if glider.formats.rolePathMatches(c, self._relPath):
+                if thandy.formats.rolePathMatches(c, self._relPath):
                     weightSoFar += m['weight']
                     usable.append( (weightSoFar, m) )
                     break
@@ -119,9 +119,9 @@ class DownloadJob:
         # XXXXX retry on failure
 
         if self._wantHash:
-            gotHash = glider.formats.getFileDigest(self._tmpPath)
+            gotHash = thandy.formats.getFileDigest(self._tmpPath)
             if gotHash != self._wantHash:
                 # XXXX Corrupt file.
                 pass
 
-        glider.utils.moveFile(self._tmpPath, self._destPath)
+        thandy.utils.moveFile(self._tmpPath, self._destPath)

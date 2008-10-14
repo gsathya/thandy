@@ -1,5 +1,5 @@
 
-             Glider: Automatic updates for Tor bundles
+             Thandy: Automatic updates for Tor bundles
 
 0. Preliminaries
 
@@ -10,11 +10,14 @@
 
 0.1. Proposed code name
 
-   Since "auto-update" is so generic, I've been thinking about going with
+   Since "auto-update" is so generic, I had been thinking about going with
    "glider", based on the sugar glider you get when you search for "handy
-   pocket creature".  I haven't yet done a search to find out whether
-   somebody else is using the name, so we shouldn't get too attached to it
-   before we see if it's taken.
+   pocket creature".  Based on conversations, it seems that "glider"
+   is taken by a well-known WoW bot, so I'm rechristening this thing
+   as "Thandy" (which could stand for Tor's Handy pocket creature if
+   you want it to, or which could also be a person's first name).
+
+   Some of this document still refers to "Glider", and needs to be updated.
 
 0.2. Non-goals
 

@@ -5,11 +5,11 @@ import sys
 import logging
 import simplejson
 
-import glider.keys
-import glider.formats
+import thandy.keys
+import thandy.formats
 
 def getKeyStore():
-    return glider.keys.KeyStore(glider.util.userFilename("secret_keys"))
+    return thandy.keys.KeyStore(thandy.util.userFilename("secret_keys"))
 
 def dumpKey(key, indent=0):
     i = " "*indent
@@ -58,17 +58,17 @@ def makepackage(args):
     configFile = args[0]
     dataFile = args[1]
     print "Generating package."
-    package = glider.formats.makePackageObj(configFile, dataFile)
+    package = thandy.formats.makePackageObj(configFile, dataFile)
     relpath = package['location']
     print "need a key with role matching [package %s]"%relpath
     ks = getKeyStore()
     ks.load()
     key = getKey(ks, keyid=keyid, role='package', path=relpath)
-    signable = glider.formats.makeSignable(package)
-    glider.formats.sign(signable, key)
+    signable = thandy.formats.makeSignable(package)
+    thandy.formats.sign(signable, key)
 
     if 1:
-        ss, r, p = glider.formats.checkSignedObj(signable, ks)
+        ss, r, p = thandy.formats.checkSignedObj(signable, ks)
         assert ss.isValid()
 
     location = os.path.split(package['location'])[-1]
@@ -94,25 +94,25 @@ def makebundle(args):
         f = open(pkgFile, 'r')
         p = simplejson.load(f)
         f.close()
-        _, r, _ = glider.formats.checkSignedObj(p)
+        _, r, _ = thandy.formats.checkSignedObj(p)
         if r != 'package':
             print pkgFile, "was not a package"
         packages[p['signed']['location']] = p
 
     def getHash(path):
         p = packages[path]
-        return glider.formats.getDigest(p['signed'])
+        return thandy.formats.getDigest(p['signed'])
 
-    bundleObj = glider.formats.makeBundleObj(configFile, getHash)
-    signable = glider.formats.makeSignable(bundleObj)
+    bundleObj = thandy.formats.makeBundleObj(configFile, getHash)
+    signable = thandy.formats.makeSignable(bundleObj)
 
     ks = getKeyStore()
     ks.load()
     key = getKey(ks, keyid=keyid, role="bundle", path=bundleObj['location'])
-    glider.formats.sign(signable, key)
+    thandy.formats.sign(signable, key)
 
     if 1:
-        ss, r, p = glider.formats.checkSignedObj(signable, ks)
+        ss, r, p = thandy.formats.checkSignedObj(signable, ks)
         assert ss.isValid()
 
     location = os.path.split(bundleObj['location'])[-1]
@@ -132,20 +132,20 @@ def makekeylist(args):
     if len(args) < 1:
         usage()
 
-    keylist = glider.formats.makeKeylistObj(args[0])
-    signable = glider.formats.makeSignable(keylist)
+    keylist = thandy.formats.makeKeylistObj(args[0])
+    signable = thandy.formats.makeSignable(keylist)
 
     ks = getKeyStore()
     ks.load()
     key = getKey(ks, keyid=keyid, role="master", path="/meta/keys.txt")
-    glider.formats.sign(signable, key)
+    thandy.formats.sign(signable, key)
 
     if 1:
-        ss, r, p = glider.formats.checkSignedObj(signable, ks)
+        ss, r, p = thandy.formats.checkSignedObj(signable, ks)
         assert ss.isValid()
 
     print "writing signed keylist to keys.txt"
-    glider.util.replaceFile("keys.txt",
+    thandy.util.replaceFile("keys.txt",
               simplejson.dumps(signable, indent=1, sort_keys=True),
               textMode=True)
 
@@ -154,17 +154,17 @@ def signkeylist(args):
         usage()
 
     keylist = simplejson.load(open(args[0], 'r'))
-    glider.formats.SIGNED_SCHEMA.checkMatch(keylist)
-    glider.formats.KEYLIST_SCHEMA.checkMatch(keylist['signed'])
+    thandy.formats.SIGNED_SCHEMA.checkMatch(keylist)
+    thandy.formats.KEYLIST_SCHEMA.checkMatch(keylist['signed'])
 
     ks = getKeyStore()
     ks.load()
     keys = ks.getKeysByRole("master", "/meta/keys.txt")
     for k in keys:
-        glider.formats.sign(keylist, k)
+        thandy.formats.sign(keylist, k)
 
     print "writing signed keylist to keys.txt"
-    glider.util.replaceFile("keys.txt",
+    thandy.util.replaceFile("keys.txt",
               simplejson.dumps(keylist, indent=1, sort_keys=True),
               textMode=True)
 
@@ -178,20 +178,20 @@ def makemirrorlist(args):
     if len(args) < 1:
         usage()
 
-    mirrorlist = glider.formats.makeMirrorListObj(args[0])
-    signable = glider.formats.makeSignable(mirrorlist)
+    mirrorlist = thandy.formats.makeMirrorListObj(args[0])
+    signable = thandy.formats.makeSignable(mirrorlist)
 
     ks = getKeyStore()
     ks.load()
     key = getKey(ks, keyid=keyid, role='mirrors', path="/meta/mirrors.txt")
-    glider.formats.sign(signable, key)
+    thandy.formats.sign(signable, key)
 
     if 1:
-        ss, r, p = glider.formats.checkSignedObj(signable, ks)
+        ss, r, p = thandy.formats.checkSignedObj(signable, ks)
         assert ss.isValid()
 
     print "writing signed mirrorlist to mirrors.txt"
-    glider.util.replaceFile("mirrors.txt",
+    thandy.util.replaceFile("mirrors.txt",
               simplejson.dumps(signable, indent=1, sort_keys=True),
               textMode=True)
 
@@ -201,7 +201,7 @@ def keygen(args):
     k = getKeyStore()
     k.load()
     print "Generating key. This will be slow."
-    key = glider.keys.RSAKey.generate()
+    key = thandy.keys.RSAKey.generate()
     print "Generated new key: %s" % key.getKeyID()
     k.addKey(key)
     k.save()
@@ -221,9 +221,9 @@ def addrole(args):
     ks.load()
     k = getKey(ks, args[0])
     r = args[1]
-    if r not in glider.formats.ALL_ROLES:
+    if r not in thandy.formats.ALL_ROLES:
         print "Unrecognized role %r.  Known roles are %s"%(
-            r,", ".join(glider.format.ALL_ROLES))
+            r,", ".join(thandy.format.ALL_ROLES))
         sys.exit(1)
     p = args[2]
     k.addRole(r, p)
@@ -236,9 +236,9 @@ def delrole(args):
     ks.load()
     k = getKey(ks, args[0])
     r = args[1]
-    if r not in glider.formats.ALL_ROLES:
+    if r not in thandy.formats.ALL_ROLES:
         print "Unrecognized role %r.  Known roles are %s"%(
-            r,", ".join(glider.format.ALL_ROLES))
+            r,", ".join(thandy.format.ALL_ROLES))
         sys.exit(1)
     p = args[2]
 

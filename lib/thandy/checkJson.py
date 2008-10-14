@@ -2,13 +2,13 @@
 import re
 import sys
 
-import glider
+import thandy
 
 class Schema:
     def matches(self, obj):
         try:
             self.checkMatch(obj)
-        except glider.FormatException:
+        except thandy.FormatException:
             return False
         else:
             return True
@@ -48,7 +48,7 @@ class RE(Schema):
         self._reName = reName
     def checkMatch(self, obj):
         if not isinstance(obj, basestring) or not self._re.match(obj):
-            raise glider.FormatException("%r did not match %s"
+            raise thandy.FormatException("%r did not match %s"
                                          %(obj,self._reName))
 
 class Str(Schema):
@@ -63,7 +63,7 @@ class Str(Schema):
         self._str = val
     def checkMatch(self, obj):
         if self._str != obj:
-            raise glider.FormatException("Expected %r; got %r"%(self._str, obj))
+            raise thandy.FormatException("Expected %r; got %r"%(self._str, obj))
 
 class AnyStr(Schema):
     """
@@ -85,7 +85,7 @@ class AnyStr(Schema):
         pass
     def checkMatch(self, obj):
         if not isinstance(obj, basestring):
-            raise glider.FormatException("Expected a string; got %r"%obj)
+            raise thandy.FormatException("Expected a string; got %r"%obj)
 
 class ListOf(Schema):
     """
@@ -108,16 +108,16 @@ class ListOf(Schema):
         self._listName = listName
     def checkMatch(self, obj):
         if not isinstance(obj, (list, tuple)):
-            raise glider.FormatException("Expected %s; got %r"
+            raise thandy.FormatException("Expected %s; got %r"
                                          %(self._listName,obj))
         for item in obj:
             try:
                 self._schema.checkMatch(item)
-            except glider.FormatException, e:
-                raise glider.FormatException("%s in %s"%(e, self._listName))
+            except thandy.FormatException, e:
+                raise thandy.FormatException("%s in %s"%(e, self._listName))
 
         if not (self._minCount <= len(obj) <= self._maxCount):
-            raise glider.FormatException("Length of %s out of range"
+            raise thandy.FormatException("Length of %s out of range"
                                          %self._listName)
 
 class Struct(Schema):
@@ -142,13 +142,13 @@ class Struct(Schema):
         self._structName = structName
     def checkMatch(self, obj):
         if not isinstance(obj, (list, tuple)):
-            raise glider.FormatException("Expected %s; got %r"
+            raise thandy.FormatException("Expected %s; got %r"
                                          %(self._structName,obj))
         elif len(obj) < len(self._subschemas):
-            raise glider.FormatException(
+            raise thandy.FormatException(
                 "Too few fields in %s"%self._structName)
         elif len(obj) > len(self._subschemas) and not self._allowMore:
-            raise glider.FormatException(
+            raise thandy.FormatException(
                 "Too many fields in %s"%self._structName)
         for item, schema in zip(obj, self._subschemas):
             schema.checkMatch(item)
@@ -174,7 +174,7 @@ class DictOf(Schema):
         try:
             iter = obj.iteritems()
         except AttributeError:
-            raise glider.FormatException("Expected a dict; got %r"%obj)
+            raise thandy.FormatException("Expected a dict; got %r"%obj)
 
         for k,v in iter:
             self._keySchema.checkMatch(k)
@@ -220,14 +220,14 @@ class Obj(Schema):
                 item = obj[k]
             except KeyError:
                 if not isinstance(schema, Opt):
-                    raise glider.FormatException("Missing key %s in %s"
+                    raise thandy.FormatException("Missing key %s in %s"
                                                  %(k,self._objname))
 
             else:
                 try:
                     schema.checkMatch(item)
-                except glider.FormatException, e:
-                    raise glider.FormatException("%s in %s.%s"
+                except thandy.FormatException, e:
+                    raise thandy.FormatException("%s in %s.%s"
                                                  %(e,self._objname,k))
 
 
@@ -254,9 +254,9 @@ class Int(Schema):
         if isinstance(obj, bool) or not isinstance(obj, (int, long)):
             # We need to check for bool as a special case, since bool
             # is for historical reasons a subtype of int.
-            raise glider.FormatException("Got %r instead of an integer"%obj)
+            raise thandy.FormatException("Got %r instead of an integer"%obj)
         elif not (self._lo <= obj <= self._hi):
-            raise glider.FormatException("%r not in range [%r,%r]"
+            raise thandy.FormatException("%r not in range [%r,%r]"
                                          %(obj, self._lo, self._hi))
 
 class Bool(Schema):
@@ -271,4 +271,4 @@ class Bool(Schema):
         pass
     def checkMatch(self, obj):
         if not isinstance(obj, bool):
-            raise glider.FormatException("Got %r instead of a boolean"%obj)
+            raise thandy.FormatException("Got %r instead of a boolean"%obj)

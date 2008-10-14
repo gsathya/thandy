@@ -3,12 +3,12 @@ import os
 import sys
 import getopt
 
-import glider.util
-import glider.repository
-import glider.download
+import thandy.util
+import thandy.repository
+import thandy.download
 
 def update(args):
-    repoRoot = glider.util.userFilename("cache")
+    repoRoot = thandy.util.userFilename("cache")
     options, args = getopt.getopt(args, "", [ "repo=", "no-download" ])
     download = True
 
@@ -18,7 +18,7 @@ def update(args):
         elif o == "--no-download":
             download = False
 
-    repo = glider.repository.LocalRepository(repoRoot)
+    repo = thandy.repository.LocalRepository(repoRoot)
 
     files = repo.getFilesToUpdate(trackingBundles=args)
 
@@ -27,12 +27,12 @@ def update(args):
 
     mirrorlist = repo.getMirrorlistFile().get()
 
-    downloader = glider.download.Downloads()
+    downloader = thandy.download.Downloads()
     downloader.start()
 
     for f in files:
         # XXXX Use hash.
-        dj = glider.download.DownloadJob(f, repo.getFilename(f),
+        dj = thandy.download.DownloadJob(f, repo.getFilename(f),
                                          mirrorlist)
         downloader.addDownloadJob(dj)
         # XXXX replace file in repository if ok; reload; see what changed.

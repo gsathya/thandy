@@ -13,8 +13,8 @@ import sys
 import simplejson
 import getpass
 
-import glider.formats
-import glider.util
+import thandy.formats
+import thandy.util
 
 class PublicKey:
     def __init__(self):
@@ -34,13 +34,13 @@ class PublicKey:
     def getRoles(self):
         return self._roles
     def addRole(self, role, path):
-        assert role in glider.formats.ALL_ROLES
+        assert role in thandy.formats.ALL_ROLES
         self._roles.append((role, path))
     def clearRoles(self):
         del self._roles[:]
     def hasRole(self, role, path):
         for r, p in self._roles:
-            if r == role and glider.formats.rolePathMatches(p, path):
+            if r == role and thandy.formats.rolePathMatches(p, path):
                 return True
         return False
 
@@ -73,10 +73,10 @@ def binaryToInt(binary):
    return long(binascii.b2a_hex(binary), 16)
 
 def intToBase64(number):
-    return glider.formats.formatBase64(intToBinary(number))
+    return thandy.formats.formatBase64(intToBinary(number))
 
 def base64ToInt(number):
-    return binaryToInt(glider.formats.parseBase64(number))
+    return binaryToInt(thandy.formats.parseBase64(number))
 
 def _pkcs1_padding(m, size):
     # I'd rather use OAEP+, but apparently PyCrypto barely supports
@@ -130,7 +130,7 @@ class RSAKey(PublicKey):
     def fromJSon(obj):
         # obj must match RSAKEY_SCHEMA
 
-        glider.formats.RSAKEY_SCHEMA.checkMatch(obj)
+        thandy.formats.RSAKEY_SCHEMA.checkMatch(obj)
         n = base64ToInt(obj['n'])
         e = base64ToInt(obj['e'])
         if obj.has_key('d'):
@@ -170,14 +170,14 @@ class RSAKey(PublicKey):
     def getKeyID(self):
         if self.keyid == None:
             d_obj = Crypto.Hash.SHA256.new()
-            glider.formats.getDigest(self.format(), d_obj)
-            self.keyid = glider.formats.formatHash(d_obj.digest())
+            thandy.formats.getDigest(self.format(), d_obj)
+            self.keyid = thandy.formats.formatHash(d_obj.digest())
         return self.keyid
 
     def _digest(self, obj, method=None):
         if method in (None, "sha256-pkcs1"):
             d_obj = Crypto.Hash.SHA256.new()
-            glider.formats.getDigest(obj, d_obj)
+            thandy.formats.getDigest(obj, d_obj)
             digest = d_obj.digest()
             return ("sha256-pkcs1", digest)
 
@@ -292,10 +292,10 @@ def decryptSecret(encrypted, password):
        Raises BadPassword if the password was not correct.
     """
     if encrypted[:5] != "GKEY1":
-        raise glider.UnknownFormat()
+        raise thandy.UnknownFormat()
     encrypted = encrypted[5:]
     if len(encrypted) < SALTLEN+1+16:
-        raise glider.FormatException()
+        raise thandy.FormatException()
 
     salt = encrypted[:SALTLEN+1]
     iv = encrypted[SALTLEN+1:SALTLEN+1+16]
@@ -319,13 +319,13 @@ def decryptSecret(encrypted, password):
     d.update(salt)
 
     if d.digest() != hash:
-        raise glider.BadPassword()
+        raise thandy.BadPassword()
 
     return secret
 
-class KeyStore(glider.formats.KeyDB):
+class KeyStore(thandy.formats.KeyDB):
     def __init__(self, fname, encrypted=True):
-        glider.formats.KeyDB.__init__(self)
+        thandy.formats.KeyDB.__init__(self)
 
         self._loaded = None
         self._fname = fname
@@ -392,7 +392,7 @@ class KeyStore(glider.formats.KeyDB):
         contents = simplejson.dumps(listOfKeys)
         if self._encrypted:
             contents = encryptSecret(contents, password)
-        glider.util.replaceFile(self._fname, contents)
+        thandy.util.replaceFile(self._fname, contents)
         self._passwd = password # It worked.
         logging.info("Done.")
 
