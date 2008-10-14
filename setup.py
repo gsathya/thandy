@@ -43,7 +43,7 @@ def makescripts(extrapath=None):
         if extrapath:
             f.write('PYTHONPATH="$PYTHONPATH:%s"\n'%extrapath)
             f.write('export PYTHONPATH\n')
-        f.write('%s -m thandy.%s "$@"\n' %(sys.executable, modname))
+        f.write('%s -m thandy/%s "$@"\n' %(sys.executable, modname))
         f.close()
         SCRIPTS.append(fname)
 
