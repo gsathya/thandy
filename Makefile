@@ -1,6 +1,9 @@
 
-export PYTHONPATH=./lib
+all:
+	python setup.py build
 
 test:
-	#python -m sexp.tests
-	python -m thandy.tests
+	export PYTHONPATH=./lib && python -m thandy.tests
+
+install:
+	python setup.py install

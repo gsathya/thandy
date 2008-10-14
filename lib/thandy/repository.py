@@ -1,3 +1,4 @@
+# Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
 import thandy.formats
 import thandy.util

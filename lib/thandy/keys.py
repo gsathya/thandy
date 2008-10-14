@@ -1,3 +1,4 @@
+# Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
 # These require PyCrypto.
 import Crypto.PublicKey.RSA
@@ -17,9 +18,8 @@ import thandy.formats
 import thandy.util
 
 class PublicKey:
+    """Abstract base class for public keys."""
     def __init__(self):
-        # Confusingly, these roles are the ones used for a private key to
-        # remember what we're willing to do with it.
         self._roles = []
     def format(self):
         raise NotImplemented()
@@ -32,13 +32,25 @@ class PublicKey:
     def getKeyID(self):
         raise NotImplemented()
     def getRoles(self):
+        """Remove a list of all roles supported by this key.  A role is
+           from this key.  A role is a doctype,pathPattern tuple.
+        """
         return self._roles
     def addRole(self, role, path):
+        """Add a role to the list of roles supported by this key.
+           A role is a permission to sign a given kind of document
+           (one of thandy.format.ALL_ROLES) at a given set of relative
+           paths.
+        """
         assert role in thandy.formats.ALL_ROLES
         self._roles.append((role, path))
     def clearRoles(self):
+        """Remove all roles from this key."""
         del self._roles[:]
     def hasRole(self, role, path):
+        """Return true iff this key has a role that allows it to sign
+           a document of type 'role' at location in the repository 'path'.
+        """
         for r, p in self._roles:
             if r == role and thandy.formats.rolePathMatches(p, path):
                 return True
@@ -57,6 +69,7 @@ if hex(1L).upper() == "0X1L":
         return binascii.a2b_hex(h)
 elif hex(1L).upper() == "0X1":
     def intToBinary(number):
+        "Variant for future versions of pythons that don't append 'L'."
         h = hex(long(number))
         h = h[2:]
         if len(h)%2:
@@ -73,9 +86,11 @@ def binaryToInt(binary):
    return long(binascii.b2a_hex(binary), 16)
 
 def intToBase64(number):
+    """Convert an int or long to a big-endian base64-encoded value."""
     return thandy.formats.formatBase64(intToBinary(number))
 
 def base64ToInt(number):
+    """Convert a big-endian base64-encoded value to a long."""
     return binaryToInt(thandy.formats.parseBase64(number))
 
 def _pkcs1_padding(m, size):
@@ -123,11 +138,14 @@ class RSAKey(PublicKey):
 
     @staticmethod
     def generate(bits=2048):
+        """Generate a new RSA key, with modulus length 'bits'."""
         key = Crypto.PublicKey.RSA.generate(bits=bits, randfunc=os.urandom)
         return RSAKey(key)
 
     @staticmethod
     def fromJSon(obj):
+        """Construct an RSA key from the output of the format() method.
+        """
         # obj must match RSAKEY_SCHEMA
 
         thandy.formats.RSAKEY_SCHEMA.checkMatch(obj)
@@ -150,9 +168,14 @@ class RSAKey(PublicKey):
         return result
 
     def isPrivateKey(self):
+        """Return true iff this key has private-key components"""
         return hasattr(self.key, 'd')
 
     def format(self, private=False, includeRoles=False):
+        """Returna a new object to represent this key in json format.
+           If 'private', include private-key data.  If 'includeRoles',
+           include role information.
+        """
         n = intToBase64(self.key.n)
         e = intToBase64(self.key.e)
         result = { '_keytype' : 'rsa',
@@ -168,25 +191,19 @@ class RSAKey(PublicKey):
         return result
 
     def getKeyID(self):
+        """Return the KeyID for this key.
+        """
         if self.keyid == None:
             d_obj = Crypto.Hash.SHA256.new()
             thandy.formats.getDigest(self.format(), d_obj)
             self.keyid = thandy.formats.formatHash(d_obj.digest())
         return self.keyid
 
-    def _digest(self, obj, method=None):
-        if method in (None, "sha256-pkcs1"):
-            d_obj = Crypto.Hash.SHA256.new()
-            thandy.formats.getDigest(obj, d_obj)
-            digest = d_obj.digest()
-            return ("sha256-pkcs1", digest)
-
-        raise UnknownMethod(method)
-
     def sign(self, obj=None, digest=None):
         assert _xor(obj == None, digest == None)
+        method = "sha256-pkcs1"
         if digest == None:
-            method, digest = self._digest(obj)
+            digest = thandy.formats.getDigest(obj)
         m = _pkcs1_padding(digest, (self.key.size()+1) // 8)
         sig = intToBase64(self.key.sign(m, "")[0])
         return (method, sig)
@@ -194,9 +211,9 @@ class RSAKey(PublicKey):
     def checkSignature(self, method, sig, obj=None, digest=None):
         assert _xor(obj == None, digest == None)
         if method != "sha256-pkcs1":
-            raise UnknownMethod("method")
+            raise UnknownMethod(method)
         if digest == None:
-            method, digest = self._digest(obj, method)
+            digest = thandy.formats.getDigest(obj)
         sig = base64ToInt(sig)
         m = _pkcs1_padding(digest, (self.key.size()+1) // 8)
         return bool(self.key.verify(m, (sig,)))
@@ -324,6 +341,7 @@ def decryptSecret(encrypted, password):
     return secret
 
 class KeyStore(thandy.formats.KeyDB):
+    """Helper to store private keys in an encrypted file."""
     def __init__(self, fname, encrypted=True):
         thandy.formats.KeyDB.__init__(self)
 
