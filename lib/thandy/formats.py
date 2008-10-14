@@ -152,6 +152,60 @@ def checkSignatures(signed, keyDB, role=None, path=None):
 
     return SignatureStatus(goodSigs, badSigs, unknownSigs, tangentialSigs)
 
+def _encodeCanonical_makeiter(obj):
+    """Return an iterator to encode 'obj' canonically, and a nil
+       cleanup function.  Works with newer versions of simplejson that
+       have a _make_iterencode method.
+    """
+    def default(o):
+        raise TypeError("Can't encode %r", o)
+    def floatstr(o):
+        raise TypeError("Floats not allowed.")
+    def canonical_str_encoder(s):
+        return '"%s"' % re.sub(r'(["\\])', r'\\\1', s)
+
+    # XXX This is, alas, a hack.  I'll submit a canonical JSon patch to
+    # the simplejson folks.
+    iterator = simplejson.encoder._make_iterencode(
+        None, default, canonical_str_encoder, None, floatstr,
+        ":", ",", True, False, True)(obj, 0)
+
+    return iterator, lambda:None
+
+def _encodeCanonical_monkeypatch(obj):
+    """Return an iterator to encode 'obj' canonically, and a cleanup
+       function to un-monkeypatch simplejson.  Works with older
+       versions of simplejson.  This is not threadsafe wrt other
+       invocations of simplejson, so until we're all upgraded, no
+       doing canonical encodings outside of the main thread.
+    """
+    def default(o):
+        raise TypeError("Can't encode %r", o)
+    save_floatstr = simplejson.encoder.floatstr
+    save_encode_basestring = simplejson.encoder.encode_basestring
+    def floatstr(o):
+        raise TypeError("Floats not allowed.")
+    def canonical_str_encoder(s):
+        return '"%s"' % re.sub(r'(["\\])', r'\\\1', s)
+    simplejson.encoder.floatstr = floatstr
+    simplejson.encoder.encode_basestring = canonical_str_encoder
+    def unpatch():
+        simplejson.encoder.floatstr = save_floatstr
+        simplejson.encoder.encode_basestring = save_encode_basestring
+
+    encoder = simplejson.encoder.JSONEncoder(ensure_ascii=False,
+                                             check_circular=False,
+                                             allow_nan=False,
+                                             sort_keys=True,
+                                             separators=(",",":"),
+                                             default=default)
+    return encoder.iterencode(obj), unpatch
+
+if hasattr(simplejson.encoder, "_make_iterencode"):
+    _encodeCanonical = _encodeCanonical_makeiter
+else:
+    _encodeCanonical = _encodeCanonical_monkeypatch
+
 def encodeCanonical(obj, outf=None):
     """Encode the object obj in canoncial JSon form, as specified at
        http://wiki.laptop.org/go/Canonical_JSON .  It's a restricted
@@ -168,27 +222,19 @@ def encodeCanonical(obj, outf=None):
        >>> encodeCanonical({"x" : 3, "y" : 2})
        '{"x":3,"y":2}'
     """
-    def default(o):
-        raise TypeError("Can't encode %r", o)
-    def floatstr(o):
-        raise TypeError("Floats not allowed.")
-    def canonical_str_encoder(s):
-        return '"%s"' % re.sub(r'(["\\])', r'\\\1', s)
-
-    # XXX This is, alas, a hack.  I'll submit a canonical JSon patch to
-    # the simplejson folks.
-
-    iterator = simplejson.encoder._make_iterencode(
-        None, default, canonical_str_encoder, None, floatstr,
-        ":", ",", True, False, True)(obj, 0)
 
     result = None
     if outf == None:
         result = [ ]
         outf = result.append
 
-    for u in iterator:
-        outf(u.encode("utf-8"))
+    iterator, cleanup = _encodeCanonical(obj)
+
+    try:
+        for u in iterator:
+            outf(u.encode("utf-8"))
+    finally:
+        cleanup()
     if result is not None:
         return "".join(result)
 
