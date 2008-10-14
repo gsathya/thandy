@@ -1,39 +1,54 @@
 
-
 o Write spec
 
 . Write server-side code (python)
-  o S-expression lib
-  . Code to manage data formats
-    . Parse
+  X S-expression lib
+  o Code to manage data formats
+    o Parse
     o Validate
-  - Code to wrangle private keys
+  o Code to wrangle private keys
     o Generate
-    . Store, load (password-protected)
-    - Print for posterity
+    o Store, load (password-protected)
+    o Print for posterity
+    o Associate with roles.
+  o Code to generate timestamp files
+  o Code to generate mirror files
+  o Code to generate keylist files
+  o and add new keys to them
+  o and remove keys.
 
-  - Code to generate timestamp files
-  - Code to generate mirror files
-  - Code to generate keylist files, and add new keys to them, and
-    remove keys.
+o Repository code.
+  o make access functions independent of consistency/loading functions
 
 - Write client-side code
-  - Decide early if a python implementation will do for v1.
-    IF SO:
+  . Decide early if a python implementation will do for v1.
      - Adjust httplib, urllib2 to use socks4a.
        - Check SOCKS package for suitability as basis for socks4a support?
      - Look into best packageing practices
-    IF NOT:
-     - Maybe use curllib for downloading, unless there's something
-       better.
-     - Check out Ron's reference code for s-expression handling.
 
-  - Write cacheing code
-  - Write code to pick a mirror
-  - Write code to grab a timestamp file and figure out what to do.
-  - Write code to update other files
-  - Write code to run, telling another process about status,
+  o Write cacheing code
+  o Write code to pick a mirror
+  o Write code to grab a timestamp file and figure out what to do.
+  o Write code to update other files
+  . Write code to run, telling another process about status,
     eventually coming up with a list of packages to install or an
     "A-OK" signal.
 
-  - GUI
+  D GUI
+
+  - DL-via-Tor
+  - Install-when-done
+  - Verbose output
+  - Rendezvous-back with Tor when done.
+
+- Wrapping
+  - More unit tests
+  - Setup.py script to install everything
+
+- Documentation
+  - HOWTO guides
+  . full pydoc
+  - revise spec
+
+- Testing
+  - Much bigger unit tests.

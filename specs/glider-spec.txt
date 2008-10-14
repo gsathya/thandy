@@ -307,6 +307,14 @@
           (signature ({(keyid K) (method M) (ATTR VAL)*}) SIG)+
        )
 
+       { "_type" : "Signed",
+         "signed" : X,
+         "sigatures" : [
+            { "keyid" : K,
+              "method" : M,
+              ...
+              "sig" : S } ]
+
    where: X is a list whose first element describes the signed object.
           K is the identifier of a key signing the document
           M is the method to be used to make the signature
@@ -324,6 +332,11 @@
 
    All keys are of the format:
       (pubkey ({(type TYPE) (ATTR VAL)*}) KEYVAL)
+
+      { "_keytype" : TYPE,
+         ...
+        "keyval" : KEYVAL }
+
    where TYPE is a string describing the type of the key and how it's
    used to sign documents.  The type determines the interpretation of
    KEYVAL.
@@ -335,6 +348,10 @@
    is a 2-element list of (e n), with both values given in big-endian
    binary format.  [This makes keys 45-60% more compact than using
    decimal integers.]
+
+      {Values given as integers.}
+
+      {'e' : e, 'n' : n, big-endian hex. }
 
    All RSA keys must be at least 2048 bits long.
 
@@ -370,6 +387,13 @@
      ...
    )
 
+     { "_type" : "Keylist",
+       "ts" : TIME,
+       "keys" : [
+           { "roles" : [ [ ROLE, PATH ], ... ],
+             ...
+             "key" : KEY }, ... ] }
+
    The "ts" line describes when the keys file was updated.  Clients
    MUST NOT replace a file with an older one, and SHOULD NOT accept a
    file too far in the future.
@@ -392,7 +416,18 @@
        ( (mirror ({(name N) (urlbase U) (contents PATH+) (weight W)
                    (official)?  (ATTR VAL)})) * )
      ...
-  )
+    )
+
+    { "_type" : "Mirrorlist",
+      "mirrors" : [
+         { "name" : N,
+           "urlbase" : U,
+           "contents" : [PATH ... ] ,
+           "weight" : W,
+           "official" : BOOL,
+           ...
+         }, ... ]
+    }
 
   Every mirror is a copy of some or all of the directory hierarchy
   containing at least the /meta, /bundles/, and /pkginfo directories.
@@ -417,12 +452,20 @@
     ({(at TIME)
       (m TIME MIRRORLISTHASH)
       (k TIME KEYLISTHASH)
-      (b NAME VERSION TIME PATH HASH)*})
+      (b NAME VERSION PATH TIME HASH)*})
   )
+
+    { "_type" : Timestamp,
+      "at" : TIME,
+      "m" : [ TIME, HASH ],
+      "k" : [ TIME, HASH ],
+      "b" : { NAME :
+                 [ [ Version, Path, Time, Hash ] ] }
+    }
 
   TIME is when the timestamp was signed.  MIRRORLISTHASH is the digest
   of the mirror-list file; KEYLISTHASH is the digest of the key list
-  file; and the 'b' entries are a list of the latest version of each
+  file; and the 'b' entries are a list of the latest version of all
   bundles and their locations and hashes.
 
 3.6. File formats: bundle files
@@ -439,6 +482,23 @@
                                 (longloss LANG TEXT)*
                                  (ATTR VAL)*})? )* )
   )
+
+     { "_type" : "Bundle",
+       "name" : NAME,
+       "at" : TIME,
+       "os" : OS,
+       [ "arch" : ARCH, ]
+       "version" : V
+       "packages" :
+          [ { "name" : NAME,
+              "version" : VERSION,
+              "path" : PATH,
+              "hash" : HASH,
+              "order" : [ INST, UPDATE, REMOVE ],
+              [ "optional : BOOL, ]
+              "gloss" : { LANG : TEXT },
+              "longgloss" : { LANG : TEXT },
+              } ] }
 
   Most elements are self-explanatory; the INST, UPDATE, and REMOVE
   elements of the order element are numbers defining the order in
@@ -646,8 +706,5 @@ R.2. Integration with existing GPG signatures
 
   The OpenPGP signature and key format is so complicated that you'd
   have to be mad to touch it.
-
-
-
 
 

@@ -4,25 +4,23 @@ import Crypto.PublicKey.RSA
 import Crypto.Hash.SHA256
 import Crypto.Cipher.AES
 
-import sexp.access
-import sexp.encode
-import sexp.parse
-
 import cPickle as pickle
 import binascii
+import logging
 import os
 import struct
+import sys
+import simplejson
+import getpass
 
-class CryptoError(Exception):
-    pass
-
-class PubkeyFormatException(Exception):
-    pass
-
-class UnknownMethod(Exception):
-    pass
+import glider.formats
+import glider.util
 
 class PublicKey:
+    def __init__(self):
+        # Confusingly, these roles are the ones used for a private key to
+        # remember what we're willing to do with it.
+        self._roles = []
     def format(self):
         raise NotImplemented()
     def sign(self, data):
@@ -34,7 +32,17 @@ class PublicKey:
     def getKeyID(self):
         raise NotImplemented()
     def getRoles(self):
-        raise NotImplemented()
+        return self._roles
+    def addRole(self, role, path):
+        assert role in glider.formats.ALL_ROLES
+        self._roles.append((role, path))
+    def clearRoles(self):
+        del self._roles[:]
+    def hasRole(self, role, path):
+        for r, p in self._roles:
+            if r == role and glider.formats.rolePathMatches(p, path):
+                return True
+        return False
 
 if hex(1L).upper() == "0X1L":
     def intToBinary(number):
@@ -64,8 +72,13 @@ def binaryToInt(binary):
    """
    return long(binascii.b2a_hex(binary), 16)
 
-def _pkcs1_padding(m, size):
+def intToBase64(number):
+    return glider.formats.formatBase64(intToBinary(number))
 
+def base64ToInt(number):
+    return binaryToInt(glider.formats.parseBase64(number))
+
+def _pkcs1_padding(m, size):
     # I'd rather use OAEP+, but apparently PyCrypto barely supports
     # signature verification, and doesn't seem to support signature
     # verification with nondeterministic padding.  "argh."
@@ -83,25 +96,28 @@ def _xor(a,b):
 class RSAKey(PublicKey):
     """
     >>> k = RSAKey.generate(bits=512)
-    >>> sexpr = k.format()
-    >>> sexpr[:2]
-    ('pubkey', [('type', 'rsa')])
-    >>> k1 = RSAKey.fromSExpression(sexpr)
+    >>> obj = k.format()
+    >>> obj['_keytype']
+    'rsa'
+    >>> base64ToInt(obj['e'])
+    65537L
+    >>> k1 = RSAKey.fromJSon(obj)
     >>> k1.key.e == k.key.e
     True
     >>> k1.key.n == k.key.n
     True
     >>> k.getKeyID() == k1.getKeyID()
     True
-    >>> s = ['tag1', ['foobar'], [['foop', 'bar']], 'baz']
-    >>> method, sig = k.sign(sexpr=s)
-    >>> k.checkSignature(method, sig, sexpr=s)
+    >>> s = { 'A B C' : "D", "E" : [ "F", "g", 99] }
+    >>> method, sig = k.sign(obj=s)
+    >>> k.checkSignature(method, sig, obj=s)
     True
     >>> s2 = [ s ]
-    >>> k.checkSignature(method, sig, sexpr=s2)
+    >>> k.checkSignature(method, sig, obj=s2)
     False
     """
     def __init__(self, key):
+        PublicKey.__init__(self)
         self.key = key
         self.keyid = None
 
@@ -111,58 +127,79 @@ class RSAKey(PublicKey):
         return RSAKey(key)
 
     @staticmethod
-    def fromSExpression(sexpr):
-        # sexpr must match PUBKEY_SCHEMA
-        typeattr = sexp.access.s_attr(sexpr[1], "type")
-        if typeattr != "rsa":
-            return None
-        if len(sexpr[2]) != 2:
-            raise PubkeyFormatException("RSA keys must have an e,n pair")
-        e,n = sexpr[2]
-        key = Crypto.PublicKey.RSA.construct((binaryToInt(n), binaryToInt(e)))
-        return RSAKey(key)
+    def fromJSon(obj):
+        # obj must match RSAKEY_SCHEMA
 
-    def format(self):
-        n = intToBinary(self.key.n)
-        e = intToBinary(self.key.e)
-        return ("pubkey", [("type", "rsa")], (e, n))
+        glider.formats.RSAKEY_SCHEMA.checkMatch(obj)
+        n = base64ToInt(obj['n'])
+        e = base64ToInt(obj['e'])
+        if obj.has_key('d'):
+            d = base64ToInt(obj['d'])
+            p = base64ToInt(obj['p'])
+            q = base64ToInt(obj['q'])
+            u = base64ToInt(obj['u'])
+            key = Crypto.PublicKey.RSA.construct((n, e, d, p, q, u))
+        else:
+            key = Crypto.PublicKey.RSA.construct((n, e))
+
+        result = RSAKey(key)
+        if obj.has_key('roles'):
+            for r, p in obj['roles']:
+                result.addRole(r,p)
+
+        return result
+
+    def isPrivateKey(self):
+        return hasattr(self.key, 'd')
+
+    def format(self, private=False, includeRoles=False):
+        n = intToBase64(self.key.n)
+        e = intToBase64(self.key.e)
+        result = { '_keytype' : 'rsa',
+                   'e' : e,
+                   'n' : n }
+        if private:
+            result['d'] = intToBase64(self.key.d)
+            result['p'] = intToBase64(self.key.p)
+            result['q'] = intToBase64(self.key.q)
+            result['u'] = intToBase64(self.key.u)
+        if includeRoles:
+            result['roles'] = self.getRoles()
+        return result
 
     def getKeyID(self):
         if self.keyid == None:
-            n = intToBinary(self.key.n)
-            e = intToBinary(self.key.e)
-            keyval = (e,n)
             d_obj = Crypto.Hash.SHA256.new()
-            sexp.encode.hash_canonical(keyval, d_obj)
-            self.keyid = ("rsa", d_obj.digest())
+            glider.formats.getDigest(self.format(), d_obj)
+            self.keyid = glider.formats.formatHash(d_obj.digest())
         return self.keyid
 
-    def _digest(self, sexpr, method=None):
+    def _digest(self, obj, method=None):
         if method in (None, "sha256-pkcs1"):
             d_obj = Crypto.Hash.SHA256.new()
-            sexp.encode.hash_canonical(sexpr, d_obj)
+            glider.formats.getDigest(obj, d_obj)
             digest = d_obj.digest()
             return ("sha256-pkcs1", digest)
 
         raise UnknownMethod(method)
 
-    def sign(self, sexpr=None, digest=None):
-        assert _xor(sexpr == None, digest == None)
+    def sign(self, obj=None, digest=None):
+        assert _xor(obj == None, digest == None)
         if digest == None:
-            method, digest = self._digest(sexpr)
+            method, digest = self._digest(obj)
         m = _pkcs1_padding(digest, (self.key.size()+1) // 8)
-        sig = intToBinary(self.key.sign(m, "")[0])
+        sig = intToBase64(self.key.sign(m, "")[0])
         return (method, sig)
 
-    def checkSignature(self, method, sig, sexpr=None, digest=None):
-        assert _xor(sexpr == None, digest == None)
+    def checkSignature(self, method, sig, obj=None, digest=None):
+        assert _xor(obj == None, digest == None)
         if method != "sha256-pkcs1":
             raise UnknownMethod("method")
         if digest == None:
-            method, digest = self._digest(sexpr, method)
-        sig = binaryToInt(sig)
+            method, digest = self._digest(obj, method)
+        sig = base64ToInt(sig)
         m = _pkcs1_padding(digest, (self.key.size()+1) // 8)
-        return self.key.verify(m, (sig,))
+        return bool(self.key.verify(m, (sig,)))
 
 SALTLEN=16
 
@@ -244,15 +281,21 @@ def encryptSecret(secret, password, difficulty=0x80):
     pad = '\x00' * padlen
 
     slen = struct.pack("!L",len(secret))
-    encrypted = e.encrypt("%s%s%s%s" % (slen, secret, d, pad))[:-padlen]
+    encrypted = e.encrypt("%s%s%s%s" % (slen, secret, d, pad))
+    if padlen:
+        encrypted = encrypted[:-padlen]
     return "GKEY1%s%s%s"%(salt, iv, encrypted)
 
 def decryptSecret(encrypted, password):
+    """Decrypt a value encrypted with encryptSecret.  Raises UnknownFormat
+       or FormatError if 'encrypted' was not generated with encryptSecret.
+       Raises BadPassword if the password was not correct.
+    """
     if encrypted[:5] != "GKEY1":
-        raise UnknownFormat()
+        raise glider.UnknownFormat()
     encrypted = encrypted[5:]
     if len(encrypted) < SALTLEN+1+16:
-        raise FormatError()
+        raise glider.FormatException()
 
     salt = encrypted[:SALTLEN+1]
     iv = encrypted[SALTLEN+1:SALTLEN+1+16]
@@ -276,8 +319,81 @@ def decryptSecret(encrypted, password):
     d.update(salt)
 
     if d.digest() != hash:
-        print repr(decrypted)
-        raise BadPassword()
+        raise glider.BadPassword()
 
     return secret
+
+class KeyStore(glider.formats.KeyDB):
+    def __init__(self, fname, encrypted=True):
+        glider.formats.KeyDB.__init__(self)
+
+        self._loaded = None
+        self._fname = fname
+        self._passwd = None
+        self._encrypted = encrypted
+
+    def getpass(self, reprompt=False):
+        if self._passwd != None:
+            return self._passwd
+        while 1:
+            pwd = getpass.getpass("Password: ", sys.stderr)
+            if not reprompt:
+                return pwd
+
+            pwd2 = getpass.getpass("Confirm: ", sys.stderr)
+            if pwd == pwd2:
+                return pwd
+            else:
+                print "Mismatch; try again."
+
+    def load(self, password=None):
+        logging.info("Loading private keys from %r...", self._fname)
+        if not os.path.exists(self._fname):
+            logging.info("...no such file.")
+            self._loaded = True
+            return
+
+        if password is None and self._encrypted:
+            password = self.getpass()
+
+        contents = open(self._fname, 'rb').read()
+        if self._encrypted:
+            contents = decryptSecret(contents, password)
+
+        listOfKeys = simplejson.loads(contents)
+        self._passwd = password # It worked.
+        if not listOfKeys.has_key('keys'):
+            listOfKeys['keys'] = []
+        for obj in listOfKeys['keys']:
+            key = RSAKey.fromJSon(obj)
+            self.addKey(key)
+            logging.info("Loaded key %s", key.getKeyID())
+
+        self._loaded = True
+
+    def setPassword(self, passwd):
+        self._passwd = passwd
+
+    def clearPassword(self):
+        self._passwd = None
+
+    def save(self, password=None):
+        if not self._loaded and self._encrypted:
+            self.load(password)
+
+        if password is None:
+            password = self.getpass(True)
+
+        logging.info("Saving private keys into %r...", self._fname)
+        listOfKeys = { 'keys' :
+                       [ key.format(private=True, includeRoles=True) for key in
+                         self._keys.values() ]
+                       }
+        contents = simplejson.dumps(listOfKeys)
+        if self._encrypted:
+            contents = encryptSecret(contents, password)
+        glider.util.replaceFile(self._fname, contents)
+        self._passwd = password # It worked.
+        logging.info("Done.")
+
 

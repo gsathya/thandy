@@ -1,0 +1,5 @@
+
+Mirror(name="moria",
+       urlbase="http://moria.seul.org/thandy-example/",
+       contents=[ "**" ],
+       weight=1)

@@ -1,28 +1,62 @@
 
-import sexp.access
-import sexp.encode
+import simplejson
 import time
 import re
+import binascii
+import calendar
 
-class FormatException(Exception):
-    pass
+import glider.checkJson
+
+import Crypto.Hash.SHA256
 
 class KeyDB:
+    """A KeyDB holds public keys, indexed by their key IDs."""
     def __init__(self):
-        self.keys = {}
+        self._keys = {}
     def addKey(self, k):
-        self.keys[k.getKeyID()] = k
+        keyid = k.getKeyID()
+        try:
+            oldkey = self._keys[keyid]
+            for r, p in oldkey.getRoles():
+                if (r, p) not in k.getRoles():
+                    k.addRole(r,p)
+        except KeyError:
+            pass
+        self._keys[k.getKeyID()] = k
     def getKey(self, keyid):
-        return self.keys[keyid]
+        return self._keys[keyid]
+    def getKeysByRole(self, role, path):
+        results = []
+        for key in self._keys.itervalues():
+            for r,p in key.getRoles():
+                if r == role:
+                    if rolePathMatches(p, path):
+                        results.append(key)
+        return results
+
+    def getKeysFuzzy(self, keyid):
+        r = []
+        for k,v in self._keys.iteritems():
+            if k.startswith(keyid):
+                r.append(v)
+        return r
+    def iterkeys(self):
+        return self._keys.itervalues()
 
 _rolePathCache = {}
 def rolePathMatches(rolePath, path):
-    """
+    """Return true iff the relative path in the filesystem 'path' conforms
+       to the pattern 'rolePath': a path that a given key is
+       authorized to sign.  Patterns are allowed to contain * to
+       represent one or more characters in a filename, and ** to
+       represent any level of directory structure.
 
     >>> rolePathMatches("a/b/c/", "a/b/c/")
     True
     >>> rolePathMatches("**/c.*", "a/b/c.txt")
     True
+    >>> rolePathMatches("**/c.*", "a/b/ctxt")
+    False
     >>> rolePathMatches("**/c.*", "a/b/c.txt/foo")
     False
     >>> rolePathMatches("a/*/c", "a/b/c")
@@ -35,40 +69,74 @@ def rolePathMatches(rolePath, path):
     try:
         regex = _rolePathCache[rolePath]
     except KeyError:
+        orig = rolePath
+        # remove duplicate slashes.
         rolePath = re.sub(r'/+', '/', rolePath)
+        # escape, then ** becomes .*
         rolePath = re.escape(rolePath).replace(r'\*\*', r'.*')
+        # * becomes [^/]*
         rolePath = rolePath.replace(r'\*', r'[^/]*')
+        # and no extra text is allowed.
         rolePath += "$"
-        regex = _rolePathCache[rolePath] = re.compile(rolePath)
+        regex = _rolePathCache[orig] = re.compile(rolePath)
     return regex.match(path) != None
 
-def checkSignatures(signed, keyDB, role, path):
+class SignatureStatus:
+    """Represents the outcome of checking signature(s) on an object."""
+    def __init__(self, good, bad, unrecognized, unauthorized):
+        # keyids for all the valid signatures
+        self._good = good[:]
+        # keyids for the invalid signatures (we had the key, and it failed).
+        self._bad = bad[:]
+        # keyids for signatures where we didn't recognize the key
+        self._unrecognized = unrecognized[:]
+        # keyids for signatures where we recognized the key, but it doesn't
+        # seem to be allowed to sign this kind of document.
+        self._unauthorized = unauthorized[:]
+
+    def isValid(self, threshold=1):
+        """Return true iff we got at least 'threshold' good signatures."""
+        return len(self._good) >= threshold
+
+    def mayNeedNewKeys(self):
+        """Return true iff downloading a new set of keys might tip this
+           signature status over to 'valid.'"""
+        return len(self._unrecognized) or len(self._unauthorized)
+
+def checkSignatures(signed, keyDB, role=None, path=None):
+    """Given an object conformant to SIGNED_SCHEMA and a set of public keys
+       in keyDB, verify the signed object in 'signed'."""
+
+    SIGNED_SCHEMA.checkMatch(signed)
+
     goodSigs = []
     badSigs = []
     unknownSigs = []
     tangentialSigs = []
 
-    assert signed[0] == "signed"
-    data = signed[1]
+    signable = signed['signed']
+    signatures = signed['signatures']
 
     d_obj = Crypto.Hash.SHA256.new()
-    sexp.encode.hash_canonical(data, d_obj)
+    getDigest(signable, d_obj)
     digest = d_obj.digest()
 
-    for signature in sexp.access.s_children(signed, "signature"):
-        attrs = signature[1]
-        sig = attrs[2]
-        keyid = s_child(attrs, "keyid")[1]
+    for signature in signatures:
+        sig = signature['sig']
+        keyid = signature['keyid']
+        method = signature['method']
+
         try:
             key = keyDB.getKey(keyid)
         except KeyError:
             unknownSigs.append(keyid)
             continue
-        method = s_child(attrs, "method")[1]
+
         try:
             result = key.checkSignature(method, sig, digest=digest)
-        except UnknownMethod:
+        except glider.UnknownMethod:
             continue
+
         if result == True:
             if role is not None:
                 for r,p in key.getRoles():
@@ -82,132 +150,264 @@ def checkSignatures(signed, keyDB, role, path):
         else:
             badSigs.append(keyid)
 
-    return goodSigs, badSigs, unknownSigs, tangentialSigs
+    return SignatureStatus(goodSigs, badSigs, unknownSigs, tangentialSigs)
+
+def encodeCanonical(obj, outf=None):
+    """Encode the object obj in canoncial JSon form, as specified at
+       http://wiki.laptop.org/go/Canonical_JSON .  It's a restricted
+       dialect of json in which keys are always lexically sorted,
+       there is no whitespace, floats aren't allowed, and only quote
+       and backslash get escaped.  The result is encoded in UTF-8,
+       and the resulting bits are passed to outf (if provided), or joined
+       into a string and returned.
+
+       >>> encodeCanonical("")
+       '""'
+       >>> encodeCanonical([1, 2, 3])
+       '[1,2,3]'
+       >>> encodeCanonical({"x" : 3, "y" : 2})
+       '{"x":3,"y":2}'
+    """
+    def default(o):
+        raise TypeError("Can't encode %r", o)
+    def floatstr(o):
+        raise TypeError("Floats not allowed.")
+    def canonical_str_encoder(s):
+        return '"%s"' % re.sub(r'(["\\])', r'\\\1', s)
+
+    # XXX This is, alas, a hack.  I'll submit a canonical JSon patch to
+    # the simplejson folks.
+
+    iterator = simplejson.encoder._make_iterencode(
+        None, default, canonical_str_encoder, None, floatstr,
+        ":", ",", True, False, True)(obj, 0)
+
+    result = None
+    if outf == None:
+        result = [ ]
+        outf = result.append
+
+    for u in iterator:
+        outf(u.encode("utf-8"))
+    if result is not None:
+        return "".join(result)
+
+def getDigest(obj, digestObj=None):
+    """Update 'digestObj' (typically a SHA256 object) with the digest of
+       the canonical json encoding of obj.  If digestObj is none,
+       compute the SHA256 hash and return it.
+
+       DOCDOC string equivalence.
+    """
+    useTempDigestObj = (digestObj == None)
+    if useTempDigestObj:
+        digestObj = Crypto.Hash.SHA256.new()
+
+    if isinstance(obj, str):
+        digestObj.update(obj)
+    elif isinstance(obj, unicode):
+        digestObj.update(obj.encode("utf-8"))
+    else:
+        encodeCanonical(obj, digestObj.update)
+
+    if useTempDigestObj:
+        return digestObj.digest()
+
+def getFileDigest(f, digestObj=None):
+    """Update 'digestObj' (typically a SHA256 object) with the digest of
+       the file object in f.  If digestObj is none, compute the SHA256
+       hash and return it.
+
+       >>> s = "here is a long string"*1000
+       >>> import cStringIO, Crypto.Hash.SHA256
+       >>> h1 = Crypto.Hash.SHA256.new()
+       >>> h2 = Crypto.Hash.SHA256.new()
+       >>> getFileDigest(cStringIO.StringIO(s), h1)
+       >>> h2.update(s)
+       >>> h1.digest() == h2.digest()
+       True
+    """
+    useTempDigestObj = (digestObj == None)
+    if useTempDigestObj:
+        digestObj = Crypto.Hash.SHA256.new()
+
+    while 1:
+        s = f.read(4096)
+        if not s:
+            break
+        digestObj.update(s)
+
+    if useTempDigestObj:
+        return digestObj.digest()
+
+def makeSignable(obj):
+    return { 'signed' : obj, 'signatures' : [] }
 
 def sign(signed, key):
-    assert sexp.access.s_tag(signed) == 'signed'
-    s = signed[1]
-    keyid = key.keyID()
+    """Add an element to the signatures of 'signed', containing a new signature
+       of the "signed" part.
+    """
 
-    oldsignatures = [ s for s in signed[2:] if s_child(s[1], "keyid") != keyid ]
-    signed[2:] = oldsignatures
+    SIGNED_SCHEMA.checkMatch(signed)
 
-    for method, sig in key.sign(s):
-        signed.append(['signature', [['keyid', keyid], ['method', method]],
-                       sig])
+    signable = signed["signed"]
+    signatures = signed['signatures']
+
+    keyid = key.getKeyID()
+
+    signatures = [ s for s in signatures if s['keyid'] != keyid ]
+
+    method, sig = key.sign(signable)
+    signatures.append({ 'keyid' : keyid,
+                        'method' : method,
+                        'sig' : sig })
+    signed['signatures'] = signatures
 
 def formatTime(t):
-    """
+    """Encode the time 't' in YYYY-MM-DD HH:MM:SS format.
+
     >>> formatTime(1221265172)
     '2008-09-13 00:19:32'
     """
     return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(t))
 
 def parseTime(s):
-    return time.timegm(time.strptime(s, "%Y-%m-%d %H:%M:%S"))
+    """Parse a time 's' in YYYY-MM-DD HH:MM:SS format."""
+    try:
+        return calendar.timegm(time.strptime(s, "%Y-%m-%d %H:%M:%S"))
+    except ValueError:
+        raise glider.FormatError("Malformed time %r", s)
 
-def _parseSchema(s, t=None):
-    sexpr = sexp.parse.parse(s)
-    schema = sexp.access.parseSchema(sexpr, t)
-    return schema
+def formatBase64(h):
+    """Return the base64 encoding of h with whitespace and = signs omitted."""
+    return binascii.b2a_base64(h).rstrip("=\n ")
 
-SCHEMA_TABLE = { }
+formatHash = formatBase64
 
-PUBKEY_TEMPLATE = r"""
-  (=pubkey ((:unordered (=type .) (:anyof (. _)))) _)
-"""
+def parseBase64(s):
+    """Parse a base64 encoding with whitespace and = signs omitted. """
+    extra = len(s) % 4
+    if extra:
+        padding = "=" * (4 - extra)
+        s += padding
+    try:
+        return binascii.a2b_base64(s)
+    except binascii.Error:
+        raise glider.FormatError("Invalid base64 encoding")
 
-SCHEMA_TABLE['PUBKEY'] = _parseSchema(PUBKEY_TEMPLATE)
+def parseHash(s):
+    h = parseBase64(s)
+    if len(h) != Crypto.Hash.SHA256.digest_size:
+        raise glider.FormatError("Bad hash length")
+    return h
 
-TIME_TEMPLATE = r"""/\{d}4-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/"""
+S = glider.checkJson
 
-SCHEMA_TABLE['TIME'] = sexp.access.parseSchema(TIME_TEMPLATE)
+# A date, in YYYY-MM-DD HH:MM:SS format.
+TIME_SCHEMA = S.RE(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}')
+# A hash, base64-encoded
+HASH_SCHEMA = S.RE(r'[a-zA-Z0-9\+\/]{43}')
 
-ATTRS_TEMPLATE = r"""(:anyof (_ *))"""
+# A hexadecimal value.
+HEX_SCHEMA = S.RE(r'[a-fA-F0-9]+')
+# A base-64 encoded value
+BASE64_SCHEMA = S.RE(r'[a-zA-Z0-9\+\/]+')
+# An RSA key; subtype of PUBKEY_SCHEMA.
+RSAKEY_SCHEMA = S.Obj(
+    _keytype=S.Str("rsa"),
+    e=BASE64_SCHEMA,
+    n=BASE64_SCHEMA)
+# Any public key.
+PUBKEY_SCHEMA = S.Obj(
+    _keytype=S.AnyStr())
 
-SCHEMA_TABLE['ATTRS'] = _parseSchema(ATTRS_TEMPLATE)
+KEYID_SCHEMA = HASH_SCHEMA
+SIG_METHOD_SCHEMA = S.AnyStr()
+RELPATH_SCHEMA = PATH_PATTERN_SCHEMA = S.AnyStr()
+URL_SCHEMA = S.AnyStr()
+VERSION_SCHEMA = S.ListOf(S.Any()) #XXXX WRONG
 
-SIGNED_TEMPLATE = r"""
- (=signed
-   _
-   (:someof
-     (=signature ((:unordered
-                    (=keyid _) (=method _) .ATTRS)) _)
+# A single signature of an object.  Indicates the signature, the id of the
+# signing key, and the signing method.
+SIGNATURE_SCHEMA = S.Obj(
+    keyid=KEYID_SCHEMA,
+    method=SIG_METHOD_SCHEMA,
+    sig=BASE64_SCHEMA)
+
+# A signed object.
+SIGNED_SCHEMA = S.Obj(
+    signed=S.Any(),
+    signatures=S.ListOf(SIGNATURE_SCHEMA))
+
+ROLENAME_SCHEMA = S.AnyStr()
+
+# A role: indicates that a key is allowed to certify a kind of
+# document at a certain place in the repo.
+ROLE_SCHEMA = S.Struct([ROLENAME_SCHEMA, PATH_PATTERN_SCHEMA])
+
+# A Keylist: indicates a list of live keys and their roles.
+KEYLIST_SCHEMA = S.Obj(
+    _type=S.Str("Keylist"),
+    ts=TIME_SCHEMA,
+    keys=S.ListOf(S.Obj(key=PUBKEY_SCHEMA, roles=S.ListOf(ROLE_SCHEMA))))
+
+# A Mirrorlist: indicates all the live mirrors, and what documents they
+# serve.
+MIRRORLIST_SCHEMA = S.Obj(
+    _type=S.Str("Mirrorlist"),
+    ts=TIME_SCHEMA,
+    mirrors=S.ListOf(S.Obj(name=S.AnyStr(),
+                           urlbase=URL_SCHEMA,
+                           contents=S.ListOf(PATH_PATTERN_SCHEMA),
+                           weight=S.Int(lo=0),
+                           )))
+
+# A timestamp: indicates the lastest versions of all top-level signed objects.
+TIMESTAMP_SCHEMA = S.Obj(
+    _type = S.Str("Timestamp"),
+    at = TIME_SCHEMA,
+    m = S.Struct([TIME_SCHEMA, HASH_SCHEMA]),
+    k = S.Struct([TIME_SCHEMA, HASH_SCHEMA]),
+    b = S.DictOf(keySchema=S.AnyStr(),
+            valSchema=
+                 S.Struct([ VERSION_SCHEMA, RELPATH_SCHEMA, TIME_SCHEMA, HASH_SCHEMA ]))
    )
- )"""
 
-SIGNED_SCHEMA = _parseSchema(SIGNED_TEMPLATE, SCHEMA_TABLE)
+# A Bundle: lists a bunch of packages that should be updated in tandem
+BUNDLE_SCHEMA = S.Obj(
+   _type=S.Str("Bundle"),
+   at=TIME_SCHEMA,
+   name=S.AnyStr(),
+   os=S.AnyStr(),
+   arch=S.Opt(S.AnyStr()),
+   version=VERSION_SCHEMA,
+   location=RELPATH_SCHEMA,
+   packages=S.ListOf(S.Obj(
+                    name=S.AnyStr(),
+                    version=VERSION_SCHEMA,
+                    path=RELPATH_SCHEMA,
+                    hash=HASH_SCHEMA,
+                    order=S.Struct([S.Int(), S.Int(), S.Int()]),
+                    optional=S.Opt(S.Bool()),
+                    gloss=S.DictOf(S.AnyStr(), S.AnyStr()),
+                    longgloss=S.DictOf(S.AnyStr(), S.AnyStr()))))
 
-KEYLIST_TEMPLATE = r"""
- (=keylist
-   (=ts .TIME)
-   (=keys
-     (:anyof
-       (=key ((:unordered (=roles (:someof (. .))) .ATTRS)) _)
-     ))
-   *
- )"""
-
-KEYLIST_SCHEMA = _parseSchema(KEYLIST_TEMPLATE, SCHEMA_TABLE)
-
-MIRRORLIST_TEMPLATE = r"""
- (=mirrorlist
-   (=ts .TIME)
-   (=mirrors (:anyof
-     (=mirror ((:unordered (=name .) (=urlbase .) (=contents (:someof .))
-                           .ATTRS)))))
-   *)
-"""
-
-MIRRORLIST_SCHEMA = _parseSchema(MIRRORLIST_TEMPLATE, SCHEMA_TABLE)
-
-TIMESTAMP_TEMPLATE = r"""
- (=ts
-   ((:unordered (=at .TIME) (=m .TIME .) (=k .TIME .)
-           (:anyof (=b . . .TIME . .)) .ATTRS))
- )"""
-
-TIMESTAMP_SCHEMA = _parseSchema(TIMESTAMP_TEMPLATE, SCHEMA_TABLE)
-
-BUNDLE_TEMPLATE = r"""
- (=bundle
-   (=at .TIME)
-   (=os .)
-   (:maybe (=arch .))
-   (=packages
-     (:someof
-      (. . . . ((:unordered
-                  (:maybe (=order . . .))
-                  (:maybe (=optional))
-                  (:anyof (=gloss . .))
-                  (:anyof (=longgloss . .))
-                  .ATTRS)))
-     )
-   )
-   *
- )"""
-
-BUNDLE_SCHEMA = _parseSchema(BUNDLE_TEMPLATE, SCHEMA_TABLE)
-
-PACKAGE_TEMPLATE = r"""
- (=package
-  ((:unordered (=name .)
-               (=version .)
-               (=format . (.ATTRS))
-               (=path .)
-               (=ts .TIME)
-               (=digest .)
-               (:anyof (=shortdesc . .))
-               (:anyof (=longdesc . .))
-               .ATTRS)))
-"""
-
-PACKAGE_SCHEMA = _parseSchema(PACKAGE_TEMPLATE, SCHEMA_TABLE)
+PACKAGE_SCHEMA = S.Obj(
+            _type=S.Str("Package"),
+            name=S.AnyStr(),
+            location=RELPATH_SCHEMA,
+            version=VERSION_SCHEMA,
+            format=S.Obj(),
+            ts=TIME_SCHEMA,
+            files=S.ListOf(S.Struct([RELPATH_SCHEMA, HASH_SCHEMA])),
+            shortdesc=S.DictOf(S.AnyStr(), S.AnyStr()),
+            longdesc=S.DictOf(S.AnyStr(), S.AnyStr()))
 
 ALL_ROLES = ('timestamp', 'mirrors', 'bundle', 'package', 'master')
 
 class Key:
-    def __init__(self, key, roles):
+    #XXXX UNUSED.
+    def __init__(self, key, roles=()):
         self.key = key
         self.roles = []
         for r,p in roles:
@@ -215,15 +415,18 @@ class Key:
 
     def addRole(self, role, path):
         assert role in ALL_ROLES
-        self.roles.append(role, path)
+        self.roles.append((role, path))
 
     def getRoles(self):
-        return self.rules
+        return self.roles
 
     @staticmethod
-    def fromSExpression(sexpr):
+    def fromJSon(obj):
         # must match PUBKEY_SCHEMA
-        typeattr = sexp.access.s_attr(sexpr[1], "type")
+        keytype = obj['_keytype']
+        if keytype == 'rsa':
+            return Key(glider.keys.RSAKey.fromJSon(obj))
+
         if typeattr == 'rsa':
             key = glider.keys.RSAKey.fromSExpression(sexpr)
             if key is not None:
@@ -240,29 +443,27 @@ class Key:
     def sign(self, sexpr=None, digest=None):
         return self.key.sign(sexpr, digest=digest)
 
-    def checkSignature(self, method, sexpr=None, digest=None):
-        if digest == None:
-            _, digest = self.key._digest(sexpr, method)
-        ok = self.key.checkSignature(method, digest=digest)
+    def checkSignature(self, method, data, signatute):
+        ok = self.key.checkSignature(method, data, signature)
         # XXXX CACHE HERE.
         return ok
 
-class Keystore(KeyDB):
+class Keylist(KeyDB):
     def __init__(self):
         KeyDB.__init__(self)
 
-    @staticmethod
-    def addFromKeylist(sexpr, allowMasterKeys=False):
-        # Don't do this until we have validated the structure.
-        for ks in sexpr.access.s_lookup_all("keys.key"):
-            attrs = ks[1]
-            key_s = ks[2]
-            roles = s_attr(attrs, "roles")
-            #XXXX Use interface of Key, not RSAKey.
-            key = Key.fromSExpression(key_s)
-            if not key:
+    def addFromKeylist(self, obj, allowMasterKeys=False):
+        for keyitem in obj['keys']:
+            key = keyitem['key']
+            roles = keyitem['roles']
+
+            try:
+                key = glider.keys.RSAKey.fromJSon(key)
+            except glider.FormatException, e:
+                print e
                 #LOG skipping key.
                 continue
+
             for r,p in roles:
                 if r == 'master' and not allowMasterKeys:
                     #LOG
@@ -273,4 +474,274 @@ class Keystore(KeyDB):
 
             self.addKey(key)
 
+class StampedInfo:
+    def __init__(self, ts, hash, version=None, relpath=None):
+        self._ts = ts
+        self._hash = hash
+        self._version = version
+        self._relpath = relpath
 
+    @staticmethod
+    def fromJSonFields(timeStr, hashStr):
+        t = parseTime(timeStr)
+        h = parseHash(hashStr)
+        return StampedInfo(t, h)
+
+    def getHash(self):
+        return self._hash
+
+    def getRelativePath(self):
+        return self._relpath
+
+class TimestampFile:
+    def __init__(self, at, mirrorlistinfo, keylistinfo, bundleinfo):
+        self._time = at
+        self._mirrorListInfo = mirrorlistinfo
+        self._keyListInfo = keylistinfo
+        self._bundleInfo = bundleinfo
+
+    @staticmethod
+    def fromJSon(obj):
+        # must be validated.
+        at = parseTime(obj['at'])
+        m = StampedInfo.fromJSonFields(*obj['m'][:2])
+        k = StampedInfo.fromJSonFields(*obj['k'][:2])
+        b = {}
+        for name, bundle in obj['b'].iteritems():
+            v = bundle[0]
+            rp = bundle[1]
+            t = parseTime(bundle[2])
+            h = parseHash(bundle[3])
+            b[name] = StampedInfo(t, h, v, rp)
+
+        return TimestampFile(at, m, k, b)
+
+    def getTime(self):
+        return self._time
+
+    def getMirrorlistInfo(self):
+        return self._mirrorListInfo
+
+    def getKeylistInfo(self):
+        return self._keyListInfo
+
+    def getBundleInfo(self, name):
+        return self._bundleInfo[name]
+
+def readConfigFile(fname, needKeys=(), optKeys=(), preload={}):
+    parsed = preload.copy()
+    result = {}
+    execfile(fname, parsed)
+
+    for k in needKeys:
+        try:
+            result[k] = parsed[k]
+        except KeyError:
+            raise glider.FormatError("Missing value for %s in %s"%k,fname)
+
+    for k in optKeys:
+        try:
+            result[k] = parsed[k]
+        except KeyError:
+            pass
+
+    return result
+
+def makePackageObj(config_fname, package_fname):
+    preload = {}
+    shortDescs = {}
+    longDescs = {}
+    def ShortDesc(lang, val): shortDescs[lang] = val
+    def LongDesc(lang, val): longDescs[lang] = val
+    preload = { 'ShortDesc' : ShortDesc, 'LongDesc' : LongDesc }
+    r = readConfigFile(config_fname,
+                       ['name',
+                        'version',
+                        'format',
+                        'location',
+                        'relpath',
+                        ], (), preload)
+
+    f = open(package_fname, 'rb')
+    digest = getFileDigest(f)
+
+    # Check fields!
+    result = { '_type' : "Package",
+               'ts' : formatTime(time.time()),
+               'name' : r['name'],
+               'location' : r['location'], #DOCDOC
+               'version' : r['version'],
+               'format' : r['format'],
+               'files' : [ [ r['relpath'], formatHash(digest) ] ],
+               'shortdesc' : shortDescs,
+               'longdesc' : longDescs
+             }
+
+    PACKAGE_SCHEMA.checkMatch(result)
+
+    return result
+
+def makeBundleObj(config_fname, getPackageHash):
+    packages = []
+    def ShortGloss(lang, val): packages[-1]['gloss'][lang] = val
+    def LongGloss(lang, val): packages[-1]['longgloss'][lang] = val
+    def Package(name, version, path, order, optional=False):
+        packages.append({'name' : name,
+                         'version' : version,
+                         'path' : path,
+                         'order' : order,
+                         'optional' : optional,
+                         'gloss' : {},
+                         'longgloss' : {} })
+    preload = { 'ShortGloss' : ShortGloss, 'LongGloss' : LongGloss,
+                'Package' : Package }
+    r = readConfigFile(config_fname,
+                       ['name',
+                        'os',
+                        'version',
+                        'location',
+                        ], ['arch'], preload)
+
+    result = { '_type' : "Bundle",
+               'at' : formatTime(time.time()),
+               'name' : r['name'],
+               'os' : r['os'],
+               'version' : r['version'],
+               'location' : r['location'],
+               'packages' : packages }
+    if r.has_key('arch'):
+        result['arch'] = r['arch']
+
+    for p in packages:
+        try:
+            p['hash'] = formatHash(getPackageHash(p['path']))
+        except KeyError:
+            raise glider.FormatException("No such package as %s"%p['path'])
+
+    BUNDLE_SCHEMA.checkMatch(result)
+    return result
+
+def versionIsNewer(v1, v2):
+    return v1 > v2
+
+def makeTimestampObj(mirrorlist_obj, keylist_obj,
+                     bundle_objs):
+    result = { '_type' : 'Timestamp',
+               'at' : formatTime(time.time()) }
+    result['m'] = [ mirrorlist_obj['ts'],
+                    formatHash(getDigest(mirrorlist_obj)) ]
+    result['k'] = [ keylist_obj['ts'],
+                    formatHash(getDigest(keylist_obj)) ]
+    result['b'] = bundles = {}
+    for bundle in bundle_objs:
+        name = bundle['name']
+        v = bundle['version']
+        entry = [ v, bundle['location'], bundle['at'], formatHash(getDigest(bundle)) ]
+        if not bundles.has_key(name) or versionIsNewer(v, bundles[name][0]):
+            bundles[name] = entry
+
+    TIMESTAMP_SCHEMA.checkMatch(result)
+
+    return result
+
+class MirrorInfo:
+    def __init__(self, name, urlbase, contents, weight):
+        self._name = name
+        self._urlbase = urlbase
+        self._contents = contents
+        self._weight = weight
+
+    def canServeFile(self, fname):
+        for c in self._contents:
+            if rolePathMatches(c, fname):
+                return True
+        return False
+
+    def getFileURL(self, fname):
+        if self._urlbase[-1] == '/':
+            return self._urlbase+fname
+        else:
+            return "%s/%s" % (self._urlbase, fname)
+
+    def format(self):
+        return { 'name' : self._name,
+                 'urlbase' : self._urlbase,
+                 'contents' : self._contents,
+                 'weight' : self._weight }
+
+def makeMirrorListObj(mirror_fname):
+    mirrors = []
+    def Mirror(*a, **kw): mirrors.append(MirrorInfo(*a, **kw))
+    preload = {'Mirror' : Mirror}
+    r = readConfigFile(mirror_fname, (), (), preload)
+    result = { '_type' : "Mirrorlist",
+               'ts' : formatTime(time.time()),
+               'mirrors' : [ m.format() for m in mirrors ] }
+
+    MIRRORLIST_SCHEMA.checkMatch(result)
+    return result
+
+def makeKeylistObj(keylist_fname, includePrivate=False):
+    keys = []
+    def Key(obj): keys.append(obj)
+    preload = {'Key': Key}
+    r = readConfigFile(keylist_fname, (), (), preload)
+
+    klist = []
+    for k in keys:
+        k = glider.keys.RSAKey.fromJSon(k)
+        klist.append({'key': k.format(private=includePrivate), 'roles' : k.getRoles() })
+
+    result = { '_type' : "Keylist",
+               'ts' : formatTime(time.time()),
+               'keys' : klist }
+
+    KEYLIST_SCHEMA.checkMatch(result)
+    return result
+
+SCHEMAS_BY_TYPE = {
+    'Keylist' : KEYLIST_SCHEMA,
+    'Mirrorlist' : MIRRORLIST_SCHEMA,
+    'Timestamp' : TIMESTAMP_SCHEMA,
+    'Bundle' : BUNDLE_SCHEMA,
+    'Package' : PACKAGE_SCHEMA,
+    }
+
+def checkSignedObj(obj, keydb=None):
+    # Returns signaturestatus, role, path on sucess.
+
+    SIGNED_SCHEMA.checkMatch(obj)
+    try:
+        tp = obj['signed']['_type']
+    except KeyError:
+        raise glider.FormatException("Untyped object")
+    try:
+        schema = SCHEMAS_BY_TYPE[tp]
+    except KeyError:
+        raise glider.FormatException("Unrecognized type %r" % tp)
+    schema.checkMatch(obj['signed'])
+
+    if tp == 'Keylist':
+        role = "master"
+        path = "/meta/keys.txt"
+    elif tp == 'Mirrorlist':
+        role = "mirrors"
+        path = "/meta/mirrors.txt"
+    elif tp == "Timestamp":
+        role = 'timestamp'
+        path = "/meta/timestamp.txt"
+    elif tp == 'Bundle':
+        role = 'bundle'
+        path = obj['signed']['location']
+    elif tp == 'Package':
+        role = 'package'
+        path = obj['signed']['location']
+    else:
+        print tp
+        raise "Foo"
+
+    ss = None
+    if keydb is not None:
+        ss = checkSignatures(obj, keydb, role, path)
+
+    return ss, role, path
