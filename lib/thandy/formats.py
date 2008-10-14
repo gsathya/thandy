@@ -153,59 +153,52 @@ def checkSignatures(signed, keyDB, role=None, path=None):
 
     return SignatureStatus(goodSigs, badSigs, unknownSigs, tangentialSigs)
 
-def _encodeCanonical_makeiter(obj):
-    """Return an iterator to encode 'obj' canonically, and a nil
-       cleanup function.  Works with newer versions of simplejson that
-       have a _make_iterencode method.
-    """
-    def default(o):
-        raise TypeError("Can't encode %r", o)
-    def floatstr(o):
-        raise TypeError("Floats not allowed.")
+def _encodeCanonical(obj, outf):
+    # Helper for encodeCanonical.  Older versions of simplejson.encoder don't
+    # even let us replace the separators.
+
     def canonical_str_encoder(s):
-        return '"%s"' % re.sub(r'(["\\])', r'\\\1', s)
+        s = '"%s"' % re.sub(r'(["\\])', r'\\\1', s)
+        if isinstance(s, unicode):
+            return s.encode("utf-8")
+        else:
+            return s
 
-    # XXX This is, alas, a hack.  I'll submit a canonical JSon patch to
-    # the simplejson folks.
-    iterator = simplejson.encoder._make_iterencode(
-        None, default, canonical_str_encoder, None, floatstr,
-        ":", ",", True, False, True)(obj, 0)
-
-    return iterator, lambda:None
-
-def _encodeCanonical_monkeypatch(obj):
-    """Return an iterator to encode 'obj' canonically, and a cleanup
-       function to un-monkeypatch simplejson.  Works with older
-       versions of simplejson.  This is not threadsafe wrt other
-       invocations of simplejson, so until we're all upgraded, no
-       doing canonical encodings outside of the main thread.
-    """
-    def default(o):
-        raise TypeError("Can't encode %r", o)
-    save_floatstr = simplejson.encoder.floatstr
-    save_encode_basestring = simplejson.encoder.encode_basestring
-    def floatstr(o):
-        raise TypeError("Floats not allowed.")
-    def canonical_str_encoder(s):
-        return '"%s"' % re.sub(r'(["\\])', r'\\\1', s)
-    simplejson.encoder.floatstr = floatstr
-    simplejson.encoder.encode_basestring = canonical_str_encoder
-    def unpatch():
-        simplejson.encoder.floatstr = save_floatstr
-        simplejson.encoder.encode_basestring = save_encode_basestring
-
-    encoder = simplejson.encoder.JSONEncoder(ensure_ascii=False,
-                                             check_circular=False,
-                                             allow_nan=False,
-                                             sort_keys=True,
-                                             separators=(",",":"),
-                                             default=default)
-    return encoder.iterencode(obj), unpatch
-
-if hasattr(simplejson.encoder, "_make_iterencode"):
-    _encodeCanonical = _encodeCanonical_makeiter
-else:
-    _encodeCanonical = _encodeCanonical_monkeypatch
+    if isinstance(obj, basestring):
+        outf(canonical_str_encoder(obj))
+    elif obj is True:
+        outf("true")
+    elif obj is False:
+            outf("false")
+    elif obj is None:
+        outf("null")
+    elif isinstance(obj, (int,long)):
+        outf(str(obj))
+    elif isinstance(obj, (tuple, list)):
+        outf("[")
+        if len(obj):
+            for item in obj[:-1]:
+                _encodeCanonical(item, outf)
+                outf(",")
+            _encodeCanonical(obj[-1], outf)
+        outf("]")
+    elif isinstance(obj, dict):
+        outf("{")
+        if len(obj):
+            items = obj.items()
+            items.sort()
+            for k,v in items[:-1]:
+                outf(canonical_str_encoder(k))
+                outf(":")
+                _encodeCanonical(v, outf)
+                outf(",")
+            k, v = items[-1]
+            outf(canonical_str_encoder(k))
+            outf(":")
+            _encodeCanonical(v, outf)
+        outf("}")
+    else:
+        raise thandy.FormatException("I can't encode %r"%obj)
 
 def encodeCanonical(obj, outf=None):
     """Encode the object obj in canoncial JSon form, as specified at
@@ -220,6 +213,10 @@ def encodeCanonical(obj, outf=None):
        '""'
        >>> encodeCanonical([1, 2, 3])
        '[1,2,3]'
+       >>> encodeCanonical([])
+       '[]'
+       >>> encodeCanonical({"A": [99]})
+       '{"A":[99]}'
        >>> encodeCanonical({"x" : 3, "y" : 2})
        '{"x":3,"y":2}'
     """
@@ -229,15 +226,11 @@ def encodeCanonical(obj, outf=None):
         result = [ ]
         outf = result.append
 
-    iterator, cleanup = _encodeCanonical(obj)
+    _encodeCanonical(obj, outf)
 
-    try:
-        for u in iterator:
-            outf(u.encode("utf-8"))
-    finally:
-        cleanup()
     if result is not None:
         return "".join(result)
+
 
 def getDigest(obj, digestObj=None):
     """Update 'digestObj' (typically a SHA256 object) with the digest of
