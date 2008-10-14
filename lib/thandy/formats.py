@@ -670,10 +670,6 @@ def makeBundleObj(config_fname, getPackage):
             p['path'] = pkginfo['location']
         if p['version'] == None:
             p['version'] = pkginfo['version']
-        if p['
-
-        except KeyError:
-            raise thandy.FormatException("No such package as %s"%p['path'])
 
     BUNDLE_SCHEMA.checkMatch(result)
     return result
