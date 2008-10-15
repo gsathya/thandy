@@ -4,7 +4,10 @@ import os
 import sys
 import tempfile
 
-import simplejson
+try:
+    import json
+except ImportError:
+    import simplejson as json
 
 import thandy.formats
 import thandy.keys
@@ -60,7 +63,7 @@ def getKeylist(keys_fname, checkKeys=True):
     if keys_fname and os.path.exists(keys_fname):
         f = open(keys_fname, 'r')
         try:
-            obj = simplejson.load(f)
+            obj = json.load(f)
         finally:
             f.close()
         ss, role, path = thandy.formats.checkSignedObj(obj, keydb)

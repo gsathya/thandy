@@ -3,7 +3,11 @@
 import thandy.formats
 import thandy.util
 
-import simplejson
+try:
+    import json
+except ImportError:
+    import simplejson as json
+
 import logging
 import os
 import threading
@@ -70,7 +74,7 @@ class RepositoryFile:
     def _checkContent(self, content):
 
         try:
-            obj = simplejson.loads(content)
+            obj = json.loads(content)
         except ValueError, e:
             raise thandy.FormatException("Couldn't decode content: %s"%e)
 

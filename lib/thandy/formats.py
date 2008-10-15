@@ -1,6 +1,10 @@
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
-import simplejson
+try:
+    import json
+except ImportError:
+    import simplejson as json
+
 import time
 import re
 import binascii
@@ -154,7 +158,7 @@ def checkSignatures(signed, keyDB, role=None, path=None):
     return SignatureStatus(goodSigs, badSigs, unknownSigs, tangentialSigs)
 
 def _encodeCanonical(obj, outf):
-    # Helper for encodeCanonical.  Older versions of simplejson.encoder don't
+    # Helper for encodeCanonical.  Older versions of json.encoder don't
     # even let us replace the separators.
 
     def canonical_str_encoder(s):

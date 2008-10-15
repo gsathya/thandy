@@ -11,12 +11,19 @@ VERSION = '0.0.1-alpha'
 # System: 0==alpha, 50==beta, 98=pre, 99==release candidate, 100==release
 VERSION_INFO = (0,0,1)
 
-for name in [ "simplejson", "Crypto" ]:
+try:
+    import Crypto
+except ImportError:
+    print "Missing support for module Crypto"
+    sys.exit(1)
+
+try:
+    import json
+except ImportError:
     try:
-        __import__(name)
+        import simplejson
     except ImportError:
-        print "Missing support for module %s"%name
-        sys.exit(1)
+        print "Missing support for module simplejson"
 
 import os, re, shutil, string, struct, sys
 

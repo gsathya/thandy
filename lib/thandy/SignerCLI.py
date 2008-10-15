@@ -4,7 +4,10 @@ import os
 import getopt
 import sys
 import logging
-import simplejson
+try:
+    import json
+except ImportError:
+    import simplejson as json
 
 import thandy.keys
 import thandy.formats
@@ -75,7 +78,7 @@ def makepackage(args):
     location = os.path.split(package['location'])[-1]
     print "Writing signed package to %s"%location
     f = open(location, 'w')
-    simplejson.dump(signable, f, indent=1)
+    json.dump(signable, f, indent=1)
     f.close()
 
 def makebundle(args):
@@ -93,7 +96,7 @@ def makebundle(args):
     for pkgFile in args[1:]:
         print "Loading", pkgFile
         f = open(pkgFile, 'r')
-        p = simplejson.load(f)
+        p = json.load(f)
         f.close()
         _, r, _ = thandy.formats.checkSignedObj(p)
         if r != 'package':
@@ -115,7 +118,7 @@ def makebundle(args):
     location = os.path.split(bundleObj['location'])[-1]
     print "Writing signed bundle to %s"%location
     f = open(location, 'w')
-    simplejson.dump(signable, f, indent=1)
+    json.dump(signable, f, indent=1)
     f.close()
 
 # ------------------------------
@@ -143,14 +146,14 @@ def makekeylist(args):
 
     print "writing signed keylist to keys.txt"
     thandy.util.replaceFile("keys.txt",
-              simplejson.dumps(signable, indent=1, sort_keys=True),
+              json.dumps(signable, indent=1, sort_keys=True),
               textMode=True)
 
 def signkeylist(args):
     if len(args) != 1:
         usage()
 
-    keylist = simplejson.load(open(args[0], 'r'))
+    keylist = json.load(open(args[0], 'r'))
     thandy.formats.SIGNED_SCHEMA.checkMatch(keylist)
     thandy.formats.KEYLIST_SCHEMA.checkMatch(keylist['signed'])
 
@@ -162,7 +165,7 @@ def signkeylist(args):
 
     print "writing signed keylist to keys.txt"
     thandy.util.replaceFile("keys.txt",
-              simplejson.dumps(keylist, indent=1, sort_keys=True),
+              json.dumps(keylist, indent=1, sort_keys=True),
               textMode=True)
 
 def makemirrorlist(args):
@@ -189,7 +192,7 @@ def makemirrorlist(args):
 
     print "writing signed mirrorlist to mirrors.txt"
     thandy.util.replaceFile("mirrors.txt",
-              simplejson.dumps(signable, indent=1, sort_keys=True),
+              json.dumps(signable, indent=1, sort_keys=True),
               textMode=True)
 
 # ------------------------------
@@ -277,7 +280,7 @@ def dumpkey(args):
 
     for k in keys:
         data = k.format(private=includeSecret, includeRoles=True)
-        print "Key(", simplejson.dumps(data, indent=2), ")"
+        print "Key(", json.dumps(data, indent=2), ")"
 
 def usage():
     print "Known commands:"

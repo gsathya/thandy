@@ -11,8 +11,12 @@ import logging
 import os
 import struct
 import sys
-import simplejson
 import getpass
+
+try:
+    import json
+except ImportError:
+    import simplejson as json
 
 import thandy.formats
 import thandy.util
@@ -380,7 +384,7 @@ class KeyStore(thandy.formats.KeyDB):
         if self._encrypted:
             contents = decryptSecret(contents, password)
 
-        listOfKeys = simplejson.loads(contents)
+        listOfKeys = json.loads(contents)
         self._passwd = password # It worked.
         if not listOfKeys.has_key('keys'):
             listOfKeys['keys'] = []
@@ -409,7 +413,7 @@ class KeyStore(thandy.formats.KeyDB):
                        [ key.format(private=True, includeRoles=True) for key in
                          self._keys.values() ]
                        }
-        contents = simplejson.dumps(listOfKeys)
+        contents = json.dumps(listOfKeys)
         if self._encrypted:
             contents = encryptSecret(contents, password)
         thandy.util.replaceFile(self._fname, contents)

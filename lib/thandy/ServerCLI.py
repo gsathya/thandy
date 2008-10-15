@@ -5,7 +5,10 @@ import sys
 import getopt
 import time
 
-import simplejson
+try:
+    import json
+except:
+    import simplejson as json
 
 import thandy.formats
 import thandy.util
@@ -24,7 +27,7 @@ def snarf(fname):
 def snarfObj(fname):
     f = open(fname, 'r')
     try:
-        return simplejson.load(f)
+        return json.load(f)
     finally:
         f.close()
 
@@ -65,7 +68,7 @@ def insert(args):
             continue
 
         try:
-            obj = simplejson.loads(content)
+            obj = json.loads(content)
         except ValueError, e:
             print "Couldn't decode %s: %s"%(fn, e)
             continue
@@ -165,7 +168,7 @@ def timestamp(args):
     for k in keydb.iterkeys():
         thandy.formats.sign(signable, k)
 
-    content = simplejson.dumps(signable, sort_keys=True)
+    content = json.dumps(signable, sort_keys=True)
     thandy.util.replaceFile(tsFname, content)
 
 def usage():
