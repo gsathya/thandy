@@ -220,6 +220,8 @@ If you're running a repository, you should have this in a crontab file,
 sat to run periodically.  Every 10-60 minutes would be fine, depending on
 your clients' settings.
 
+Note that the only bundles listed in a timestamp file are the ones under
+/bundleinfo/ in the repository.
 
 
 
