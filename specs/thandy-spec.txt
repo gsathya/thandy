@@ -37,7 +37,7 @@
 
    This is also not a general-purpose package format.  It assumes the
    existence of an external package format that can handle install,
-   update, remove, and version query.
+   update, remove, and version query.   Though see section XX.
 
 0.3. Goals
 
@@ -88,18 +88,18 @@
    them.  Example bundles could be "Tor Browser, stable series" or
    "Basic Tor, development series".
 
-   When Glider has responsibility for keeping a bundle up to date, we
+   When Thandy has responsibility for keeping a bundle up to date, we
    say that a user has "subscribed" to that bundle.
 
    Conceptually, there are four parts to keeping a bundle up to date:
 
       Polling:
-        - Periodically, Glider asks a mirror whether there is a newer
+        - Periodically, Thandy asks a mirror whether there is a newer
           version of some bundle that a user has subscribed to.  If so,
-          Glider determines what's in the bundle.
+          Thandy determines what's in the bundle.
 
       Fetching:
-        - If the bundle contains packages that Glider hasn't installed
+        - If the bundle contains packages that Thandy hasn't installed
           or hasn't cached, it needs to download them from a mirror.
           This can happen over any protocol; v1 should support at least
           http and https-over-Tor.  V1 should also support resuming
@@ -109,7 +109,7 @@
           Later versions could support Bittorrent, or whatever.
 
       Validation:
-        - Throughout the process, Glider must ensure that all the
+        - Throughout the process, Thandy must ensure that all the
           bundles are signed correctly, all the packages are signed
           correctly, and everything is up-to-date.
 
@@ -119,10 +119,10 @@
           actually the latest.
 
       Installation:
-        - Now Glider has a set of packages to install.  The format of
+        - Now Thandy has a set of packages to install.  The format of
           these packages will be platform-dependent: they could be pkg
           files on OSX, MSI files on Win32, RPMs or DEBs on Linux, and
-          so on.  Glider should query the user for permission to start
+          so on.  Thandy should query the user for permission to start
           installing packages, then install the packages.  All other
           steps should generally happen automatically, in the
           background, without needing user intervention.  This part
@@ -134,25 +134,25 @@
 
 1.1. The repository
 
-   Each Glider instance knows about one or more "repositories".  A
+   Each Thandy instance knows about one or more "repositories".  A
    repository is a filesystem somewhere that contains the packages in a
    set of bundles, and some associated metadata.  A repository must
    exist at one or more canonical hosts, and may have a number of full
    or partial mirrors.
 
-   In v1, each Glider instance will know about only one repository.
+   In v1, each Thandy instance will know about only one repository.
 
 1.2. The PKI
 
    The trust root for the whole system is, necessarily, whatever users
-   download when they first download a copy of Glider.  We need to make
+   download when they first download a copy of Thandy.  We need to make
    sure that the first download happens from a site we trust, using
    HTTPS.
 
-   Glider ships with root keys, which in turn are used to verify the
+   Thandy ships with root keys, which in turn are used to verify the
    keys for all the other roles.  There are a few root keys, operated by
    trusted admins for the system.  If root keys ever need to be changed,
-   we can just ship an update of Glider: it's supposed to be
+   we can just ship an update of Thandy: it's supposed to be
    self-updating anyway.
 
    The root keys are only used to sign a 'key list' of all the other
@@ -189,7 +189,7 @@
    installation will require higher privilege.  This means that once a
    hostile package is installed, it can basically do whatever it
    wants.  As rootkit writers demonstrate, compromise is really
-   tenuous: any attacker who can induce a user to install a hostile
+   tenacious: any attacker who can induce a user to install a hostile
    piece of code has, in effect, permanently compromised that user
    until they reinstall.
 
@@ -239,6 +239,11 @@
          packages make up a bundle, and what order to install,
          uninstall, and upgrade them in.
 
+         Each leaf directory under bundleinfo should have only a
+         single bundle's files.  Users subscribe to such a directory,
+         receiving (for example) "the most recent bundle in
+         /bundleinfo/tor-browser-stable/win32/"
+
     /pkginfo/packagename/os-arch/version/packagename-os-arch-packageversion.txt
 
          Signed by the appropriate package key.  Tells the name of the
@@ -254,116 +259,69 @@
 
 3.1. Metaformat
 
-   All documents use Rivest's SEXP meta-format as documented at
-     http://people.csail.mit.edu/rivest/sexp.html
-   with the restriction that no "display hint" fields are to be used,
-   and the base64 transit encoding isn't used either.
-
-   (We use SEXP because it's really easy to parse, really portable,
-   and unlike most other tagged data formats, has a
-   trivially-specified canonical format suitable for hashing.)
-
-   In descriptions of syntax below, we use regex-style qualifiers, so
-   that in
-        (sofa slipcover? occupant* leg+)
-   the sofa will have an optional slipcover, zero or more occupants,
-   and one or more legs.  This pattern matches (sofa leg) and (sofa
-   slipcover occupant occupant leg leg leg leg) but not (sofa leg
-   slipcover).
-
-   We also use a braces notation to indicate elements that can occur
-   in any order.  For example,
-        (bread {flour+ eggs? yeast})
-   matches a list starting with "bread", and then containing one or
-   more  of flours, zero or one occurrences of eggs, and one
-   occurrence of yeast, in any order.  This pattern matches (bread eggs
-   yeast flour) but not (bread yeast) or (bread flour eggs yeast
-   macadamias).
+   All documents use a subset of the JSON object format, with
+   floating-point numbers omitted.  When calculating the digest of an
+   object, we use the "canonical JSON" subdialect as described at
+        http://wiki.laptop.org/go/Canonical_JSON
 
 3.2. File formats: general principles
-
-   We use tagged lists (lists whose first element is a string) to
-   indicate typed objects.  Tags are generally lower-case, with
-   hyphens used for separation.  Think Lispy.
-
-   We use attrlists [lists of (key value) lists] to indicate a
-   multimap from keys to values.  Clients MUST accept unrecognized
-   keys in these attrlists.  The syntax for an attrlist with two
-   recognized and required keys is typically given as ({(key1 val1)
-   (key2 val2) (ATTR VAL)*}), indicating that the keys can occur in
-   any order, intermixed with other attributes.
 
    Timestamp files will be downloaded very frequently; all other files
    will be much smaller in size than package files.  Thus,
    size-optimization for timestamp files makes sense and most other
    other space optimizations don't.
 
-   Versions are represented as lists of the form (v I1 I2 I3 I4 ...)
+   Versions are represented as lists of the form [I1, I2, I3, I4 ...]
    where each item is a number or alphanumeric version component.  For
-   example, the version "0.2.1.5-alpha" is represented as (v 0 2 1 5
-   alpha).
+   example, the version "0.2.1.5-alpha" is represented as [0, 2, 1, 5,
+   "alpha").
 
    All signed files are of the format:
-
-       (signed
-          X
-          (signature ({(keyid K) (method M) (ATTR VAL)*}) SIG)+
-       )
-
-       { "_type" : "Signed",
-         "signed" : X,
+       { "signed" : X,
          "sigatures" : [
             { "keyid" : K,
               "method" : M,
               ...
-              "sig" : S } ]
+              "sig" : S } ..., ] }
 
    where: X is a list whose first element describes the signed object.
           K is the identifier of a key signing the document
           M is the method to be used to make the signature
-          (ATTR VAL) is an arbitrary list whose first element is a
-             string.
-          SIG is a signature of the canonical encoding of X using the
+          S is a signature of the canonical encoding of X using the
           identified key.
 
-   We define two signing methods at present:
-       sha256-oaep : A signature of the SHA256 hash of the canonical
-         encoding of X, using OAEP+ padding. [XXXX say more about mgf]
+   We define one signing methods at present:
+       sha256-pkcs1 : A signature of the SHA256 hash of the canonical
+         encoding of X, using PKCS-1 padding.
 
    All times are given as strings of the format "YYYY-MM-DD HH:MM:SS",
    in UTC.
 
    All keys are of the format:
-      (pubkey ({(type TYPE) (ATTR VAL)*}) KEYVAL)
-
       { "_keytype" : TYPE,
          ...
-        "keyval" : KEYVAL }
+      }
 
    where TYPE is a string describing the type of the key and how it's
    used to sign documents.  The type determines the interpretation of
    KEYVAL.
 
-   The ID of a key is a two-element list of the type and the SHA-256
-   hash of the canonical encoding of the KEYVAL field.
+   The ID of a key is the SHA-256 hash of the canonical encoding of
+   the key.
 
-   We define one keytype at present: 'rsa'.  The KEYVAL in this case
-   is a 2-element list of (e n), with both values given in big-endian
-   binary format.  [This makes keys 45-60% more compact than using
-   decimal integers.]
-
-      {Values given as integers.}
-
-      {'e' : e, 'n' : n, big-endian hex. }
-
-   All RSA keys must be at least 2048 bits long.
-
+   We define one keytype at present: 'rsa'.  Its format is:
+      { "_keytype" : "rsa",
+        "e" : E,
+        "n" : N },
+   where E and N are the binary representations of the exponent and
+   modulus, encoded as big-endian numbers in base 64.  All keys must
+   be at least 2048 bits long.
 
    Every role in the system is associated with a key.  Replacing
    anything but a root key is supposed to be relatively easy.
 
-   Root-keys sign other keys, and certify them as belonging to roles.
-   Clients are configured to know the root keys.
+   Master keys sign other keys, and certify them as belonging to roles.
+   Clients are configured to know the master keys.
 
    Bundle keys certify the contents of a bundle.
 
@@ -382,13 +340,6 @@
 
    The key list file is signed by multiple root keys.  It indicates
    which keys are authorized to sign which parts of the repository.
-
-   (keylist
-     (ts TIME)
-     (keys
-       ((key ({(roles (ROLE PATH)+) (ATTR VAL)*}) KEY)*)
-     ...
-   )
 
      { "_type" : "Keylist",
        "ts" : TIME,
@@ -413,21 +364,14 @@
    mirrors are active and believed to be mirroring which parts of the
    repository.
 
-   (mirrorlist
-     (ts TIME)
-     (mirrors
-       ( (mirror ({(name N) (urlbase U) (contents PATH+) (weight W)
-                   (official)?  (ATTR VAL)})) * )
-     ...
-    )
-
     { "_type" : "Mirrorlist",
+      "ts" : TIME,
       "mirrors" : [
          { "name" : N,
            "urlbase" : U,
            "contents" : [PATH ... ] ,
            "weight" : W,
-           "official" : BOOL,
+           ("official" : BOOL,)
            ...
          }, ... ]
     }
@@ -451,13 +395,6 @@
   latest versions of other files, and contains a regularly updated
   timestamp to prevent rollback attacks.
 
-  (ts
-    ({(at TIME)
-      (m TIME MIRRORLISTHASH)
-      (k TIME KEYLISTHASH)
-      (b NAME VERSION PATH TIME HASH)*})
-  )
-
     { "_type" : Timestamp,
       "at" : TIME,
       "m" : [ TIME, HASH ],
@@ -469,36 +406,25 @@
   TIME is when the timestamp was signed.  MIRRORLISTHASH is the digest
   of the mirror-list file; KEYLISTHASH is the digest of the key list
   file; and the 'b' entries are a list of the latest version of all
-  bundles and their locations and hashes.
+  bundles and their locations and hashes.  The "name" of a bundle (in
+  this context) is the directory component of the bundle's path.
 
 3.6. File formats: bundle files
-
-  (bundle
-    (at TIME)
-    (os OS)
-    [(arch ARCH)]
-    (version V)
-    (packages
-      (NAME VERSION PATH HASH ({(order INST UPDATE REMOVE)
-                                (optional)?
-                                (gloss LANG TEXT)*
-                                (longloss LANG TEXT)*
-                                 (ATTR VAL)*})? )* )
-  )
 
      { "_type" : "Bundle",
        "name" : NAME,
        "at" : TIME,
        "os" : OS,
-       [ "arch" : ARCH, ]
-       "version" : V
+       "location" : LOCATION,
+      ("arch" : ARCH,)
+       "version" : V,
        "packages" :
           [ { "name" : NAME,
               "version" : VERSION,
               "path" : PATH,
               "hash" : HASH,
               "order" : [ INST, UPDATE, REMOVE ],
-              [ "optional : BOOL, ]
+              ("optional : BOOL, )
               "gloss" : { LANG : TEXT },
               "longgloss" : { LANG : TEXT },
               } ] }
@@ -522,17 +448,16 @@
 
 3.7. File formats: package files
 
-  (package
-    ({(name NAME)
-     (version VERSION)
-     (format FMT ((ATTR VAL)*)? )
-     (path PATH)
-     (ts TIME)
-     (digest HASH)
-     (shortdesc LANG TEXT)*
-     (longdesc LANG TEXT)*
-     (ATTR VAL)* })
-  )
+   { "_type" : "Package",
+     "name" : NAME,
+     "location" : LOCATION,
+     "version" : VERSION,
+     "format" : FMT,
+     "ts" : TIME,
+     "files" : [  [ PATH, HASH ], ... ],
+     "shortdesc" : { LANG : DESC, ... },
+     "longdesc" : { LANG : DESC, ... },
+   }
 
   Most elements are self-explanatory.  The "FMT" element describes the
   file format of the package, which should give enough information
@@ -694,7 +619,7 @@ F.3. Support for more download methods
 
 F.4. Support for bogus clocks.
 
-  Glider should have a user configurable "no, my clock is _supposed_
+  Thandy should have a user configurable "no, my clock is _supposed_
   to be wrong" mode, since lots of users seem to _like_ having their
   clocks in 1970 forever.
 

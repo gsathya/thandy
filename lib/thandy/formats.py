@@ -670,6 +670,15 @@ def makeBundleObj(config_fname, getPackage):
 def versionIsNewer(v1, v2):
     return v1 > v2
 
+def getBundleKey(bundlePath):
+    """
+       >>> getBundleKey("/bundleinfo/tor-browser/win32/some-file-name.txt")
+       '/bundleinfo/tor-browser/win32/'
+    """
+    # No, we can't use "os.path.directory."  That isn't os-independent.
+    idx = bundlePath.rindex("/")
+    return bundlePath[:idx+1]
+
 def makeTimestampObj(mirrorlist_obj, keylist_obj,
                      bundle_objs):
     result = { '_type' : 'Timestamp',
@@ -680,11 +689,11 @@ def makeTimestampObj(mirrorlist_obj, keylist_obj,
                     formatHash(getDigest(keylist_obj)) ]
     result['b'] = bundles = {}
     for bundle in bundle_objs:
-        name = bundle['name']
+        k = getBundleKey(bundle['location'])
         v = bundle['version']
         entry = [ v, bundle['location'], bundle['at'], formatHash(getDigest(bundle)) ]
-        if not bundles.has_key(name) or versionIsNewer(v, bundles[name][0]):
-            bundles[name] = entry
+        if not bundles.has_key(k) or versionIsNewer(v, bundles[k]['version']):
+            bundles[k] = entry
 
     TIMESTAMP_SCHEMA.checkMatch(result)
 
