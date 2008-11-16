@@ -185,7 +185,7 @@ class DownloadJob:
             tp, val, tb = sys.exc_info()
             logging.warn("Internal during download: %s, %s", val,
                          traceback.format_exc())
-            sys.exit(1)
+            return False
 
     def _download(self):
         # Implementation function.  Unlike download(), can throw exceptions.
@@ -292,7 +292,7 @@ class ThandyDownloadJob(DownloadJob):
             for c in m['contents']:
 
                 if self._supportedURLTypes is not None:
-                    urltype = urllib2.splittype(m['urlbase'][0])
+                    urltype = urllib2.splittype(m['urlbase'])[0]
                     if urltype.lower() not in self._supportedURLTypes:
                         continue
 

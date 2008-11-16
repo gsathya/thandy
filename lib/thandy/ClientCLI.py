@@ -12,16 +12,18 @@ import thandy.repository
 import thandy.download
 import thandy.master_keys
 import thandy.packagesys.PackageSystem
+import thandy.socksurls
 
 def update(args):
     repoRoot = thandy.util.userFilename("cache")
     options, args = getopt.getopt(args, "", [ "repo=", "no-download",
                                               "loop", "no-packagesys",
-                                              "install"])
+                                              "install", "socks-port="])
     download = True
     keep_looping = False
     use_packagesys = True
     install = False
+    socksPort = None
 
     for o, v in options:
         if o == '--repo':
@@ -34,12 +36,20 @@ def update(args):
             use_packagesys = False
         elif o == '--install':
             install = True
+        elif o == "--socks-port":
+            socksPort = int(v)
+
+    if socksPort:
+        thandy.socksurls.setSocksProxy("127.0.0.1", socksPort)
 
     repo = thandy.repository.LocalRepository(repoRoot)
     packagesys = None
     if use_packagesys:
         packagesys = thandy.packagesys.PackageSystem.PackageMetasystem.create(repo)
 
+    # XXXX We could make this loop way smarter.  Right now, it doesn't
+    # back off between failures, and it doesn't notice newly downloadable files
+    # until all downloading files are finished.
     while True:
         hashes = {}
         installable = {}
@@ -87,7 +97,8 @@ def update(args):
         for f in files:
             dj = thandy.download.ThandyDownloadJob(f, repo.getFilename(f),
                                                    mirrorlist,
-                                                   wantHash=hashes.get(f))
+                                                   wantHash=hashes.get(f),
+                                                   useTor=(socksPort!=None))
 
             def successCb(rp=f):
                 rf = repo.getRequestedFile(rp)
@@ -111,7 +122,7 @@ def update(args):
 def usage():
     print "Known commands:"
     print "  update [--repo=repository] [--no-download] [--loop]"
-    print "         [--no-packagesys] [--install]"
+    print "         [--no-packagesys] [--install] [--socks-port=port]"
     sys.exit(1)
 
 def main():
