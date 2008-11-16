@@ -78,7 +78,7 @@ def makepackage(args):
     location = os.path.split(package['location'])[-1]
     print "Writing signed package to %s"%location
     f = open(location, 'w')
-    json.dump(signable, f, indent=1)
+    json.dump(signable, f, indent=1, sort_keys=True)
     f.close()
 
 def makebundle(args):
@@ -118,7 +118,7 @@ def makebundle(args):
     location = os.path.split(bundleObj['location'])[-1]
     print "Writing signed bundle to %s"%location
     f = open(location, 'w')
-    json.dump(signable, f, indent=1)
+    json.dump(signable, f, indent=1, sort_keys=True)
     f.close()
 
 # ------------------------------
@@ -280,7 +280,7 @@ def dumpkey(args):
 
     for k in keys:
         data = k.format(private=includeSecret, includeRoles=True)
-        print "Key(", json.dumps(data, indent=2), ")"
+        print "Key(", json.dumps(data, indent=2, sort_keys=True), ")"
 
 def usage():
     print "Known commands:"
