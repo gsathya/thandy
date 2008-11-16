@@ -1,12 +1,14 @@
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
+import getopt
+import logging
 import os
 import sys
-import getopt
 
 import thandy.util
 import thandy.repository
 import thandy.download
+import thandy.master_keys
 
 def update(args):
     repoRoot = thandy.util.userFilename("cache")
@@ -21,24 +23,41 @@ def update(args):
 
     repo = thandy.repository.LocalRepository(repoRoot)
 
-    files = repo.getFilesToUpdate(trackingBundles=args)
+    while True:
+        hashes = {}
+        logging.info("Checking for files to update.")
+        files = repo.getFilesToUpdate(trackingBundles=args, hashDict=hashes)
+        logging.info("Files to download are: %s", ", ".join(sorted(files)))
 
-    if not download:
-        return
+        if not download or not files:
+            return
 
-    mirrorlist = repo.getMirrorlistFile().get()
+        mirrorlist = repo.getMirrorlistFile().get()
+        if not mirrorlist:
+            mirrorlist = thandy.master_keys.DEFAULT_MIRRORLIST
 
-    downloader = thandy.download.Downloads()
-    downloader.start()
+        downloader = thandy.download.DownloadManager()
 
-    for f in files:
-        # XXXX Use hash.
-        dj = thandy.download.ThandyDownloadJob(f, repo.getFilename(f),
-                                               mirrorlist)
-        downloader.addDownloadJob(dj)
-        # XXXX replace file in repository if ok; reload; see what changed.
+        for f in files:
+            dj = thandy.download.ThandyDownloadJob(f, repo.getFilename(f),
+                                                   mirrorlist,
+                                                   wantHash=hashes.get(f))
 
-    # Wait for in-progress jobs
+            def successCb(rp=f):
+                rf = repo.getRequestedFile(rp)
+                if rf != None:
+                    rf.clear()
+                    rf.load()
+
+            downloader.addDownloadJob(dj)
+
+        logging.info("Launching downloads")
+        downloader.start()
+
+        logging.info("Waiting for downloads to finish.")
+        downloader.wait()
+        logging.info("All downloads finished.")
+
 
 # Check my repository
 
@@ -55,6 +74,9 @@ def usage():
     sys.exit(1)
 
 def main():
+    #XXXX make this an option.
+    logging.basicConfig(level=logging.DEBUG)
+
     if len(sys.argv) < 2:
         usage()
     cmd = sys.argv[1]

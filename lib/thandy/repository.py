@@ -174,6 +174,9 @@ class PkgFile:
     def clear(self):
         self._mtime = None
 
+    def load(self):
+        pass
+
     def getRelativePath(self):
         return self._relativePath
 
@@ -258,7 +261,7 @@ class LocalRepository:
             return pkg
 
     def getRequestedFile(self, relPath):
-        """ """
+        """DOCDOC"""
         for f in self._metafiles:
             if f.getRelativePath() == relPath:
                 return f
@@ -273,6 +276,8 @@ class LocalRepository:
                 rp, h = item[:2]
                 if rp == relPath:
                     return PkgFile(self, rp, thandy.formats.parseHash(h))
+
+        return None
 
     def getFilesToUpdate(self, now=None, trackingBundles=(), hashDict=None):
         """Return a set of relative paths for all files that we need
