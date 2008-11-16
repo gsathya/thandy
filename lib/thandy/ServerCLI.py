@@ -142,9 +142,10 @@ def timestamp(args):
     bundles = []
     for dirpath, dirname, fns in os.walk(os.path.join(repo, "bundleinfo")):
         for fn in fns:
+            fn = os.path.join(dirpath, fn)
             try:
                 bObj = snarfObj(fn)
-            except (ValueError, OSError), e:
+            except (ValueError, OSError, IOError), e:
                 print "(Couldn't read bundle-like %s)"%fn
                 continue
             try:
