@@ -206,6 +206,10 @@ and notes:
       can't make the timestamp until both the keys.txt and the mirrors.txt
       are inserted.)
 
+    * For the actual data files (i.e. the packages themselves), for now you
+      just copy them into the repository manually. Later there will be some
+      version of thandy-server insert that handles them too.
+
 .GENERATING TIMESTAMPS.
 
 This is the only part of Thandy that needs to be run periodically, and the
