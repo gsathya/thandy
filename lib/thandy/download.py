@@ -28,6 +28,9 @@ class DownloadManager:
         # Work queue of DownloadJobs that we intend to process once a thread
         # is free.
         self.downloadQueue = Queue.Queue()
+        # DOCDOC
+        self.resultQueue = Queue.Queue()
+
         # List of worker threads.
         self.threads = [ threading.Thread(target=self._thread, args=[idx])
                          for idx in xrange(n_threads) ]
@@ -66,19 +69,23 @@ class DownloadManager:
         """Return true iff we have no active or pending jobs."""
         self._lock.acquire()
         try:
-            return downloadQueue.empty() and len(self.downloads) == 0
+            return self.downloadQueue.empty() and len(self.downloads) == 0
         finally:
             self._lock.release()
 
     def wait(self):
         """Pause until we have no active or pending jobs."""
-        while True:
+        while not self.finished():
             self.done.acquire()
             self.done.wait()
             self.done.release()
 
-            if self.finished():
-                break
+            try:
+                while True:
+                    item = self.resultQueue.get(block=False)
+                    item()
+            except Queue.Empty:
+                pass
 
     def addDownloadJob(self, job):
         """Add another DownloadJob to the end of the work queue."""
@@ -97,6 +104,7 @@ class DownloadManager:
         while True:
             job = self.downloadQueue.get() # Grab job from queue.
             rp = job.getRelativePath()
+            success = False
             try:
                 logging.info("start %s in Thread %s", rp, idx)
                 success = job.download() # Execute the download.
@@ -109,6 +117,11 @@ class DownloadManager:
                         self.haveDownloaded[rp] = True
                 finally:
                     self._lock.release()
+
+                if success:
+                    self.resultQueue.put(job._success)
+                else:
+                    self.resultQueue.put(job._failure)
 
                 self.done.acquire()
                 self.done.notify()
@@ -128,6 +141,14 @@ class DownloadJob:
         self._tmpPath = tmpPath
         self._wantHash = wantHash
         self._useTor = useTor
+
+        self._success = lambda : None
+        self._failure = lambda : None
+
+    def setCallbacks(self, success, failure):
+        """DOCDOC"""
+        self._success = success
+        self._failure = failure
 
     def getURL(self):
         """Abstract implementation helper.  Returns the URL that the
@@ -155,7 +176,8 @@ class DownloadJob:
         try:
             self._download()
             return True
-        except (OSError, thandy.DownloadError), err:
+        except (OSError, httplib.error, urllib2.HTTPError,
+                thandy.DownloadError), err:
             # XXXXX retry on failure
             logging.warn("Download failed: %s", err)
             return False
@@ -164,7 +186,6 @@ class DownloadJob:
             logging.warn("Internal during download: %s, %s", val,
                          traceback.format_exc())
             sys.exit(1)
-
 
     def _download(self):
         # Implementation function.  Unlike download(), can throw exceptions.
@@ -177,7 +198,8 @@ class DownloadJob:
 
             if self.haveStalledFile():
                 have_length = os.stat(self._tmpPath).st_size
-                print "Have stalled file with %s bytes"%have_length
+                logging.info("Have stalled file for %s with %s bytes", url,
+                             have_length)
             else:
                 have_length = None
 
@@ -218,6 +240,7 @@ class DownloadJob:
             if gotHash != self._wantHash:
                 raise thandy.DownloadError("File hash was not as expected.")
 
+        thandy.util.ensureParentDir(self._destPath)
         thandy.util.moveFile(self._tmpPath, self._destPath)
 
 
@@ -245,7 +268,7 @@ class ThandyDownloadJob(DownloadJob):
 
         DownloadJob.__init__(self, destPath, None, wantHash=wantHash,
                              useTor=useTor)
-        self._mirrorList = mirrorList[:]
+        self._mirrorList = mirrorList
         self._relPath = relPath
 
         tmppath = thandy.util.userFilename("tmp")
@@ -279,7 +302,10 @@ class ThandyDownloadJob(DownloadJob):
 
         mirror = thandy.util.randChooseWeighted(usable)
 
-        return m['urlbase'] + self._relPath
+        if m['urlbase'][-1] == '/' and self._relPath[0] == '/':
+            return m['urlbase'] + self._relPath[1:]
+        else:
+            return m['urlbase'] + self._relPath
 
     def getRelativePath(self):
         return self._relPath

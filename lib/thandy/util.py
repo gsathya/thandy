@@ -24,7 +24,6 @@ def moveFile(fromLocation, toLocation):
 
     os.rename(fromLocation, toLocation)
 
-
 def replaceFile(fname, contents, textMode=False):
     """overwrite the file in 'fname' atomically with the content of 'contents'
     """
@@ -48,13 +47,19 @@ def userFilename(name):
         os.makedirs(base, 0700)
     return os.path.join(base, name)
 
+def ensureParentDir(name):
+    """DOCDOC"""
+    directory = os.path.split(name)[0]
+    if not os.path.exists(directory):
+        os.makedirs(directory, 0700)
+
 def getKeylist(keys_fname, checkKeys=True):
     import thandy.master_keys
 
     keydb = thandy.formats.Keylist()
 
     for key in thandy.master_keys.MASTER_KEYS:
-        keydb.addKey(key)
+        keydb.addKey(thandy.keys.RSAKey.fromJSon(key))
 
     user_keys = userFilename("preload_keys")
     if os.path.exists(user_keys):
