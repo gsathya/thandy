@@ -1,54 +1,36 @@
 
-o Write spec
-
-. Write server-side code (python)
-  X S-expression lib
-  o Code to manage data formats
-    o Parse
-    o Validate
-  o Code to wrangle private keys
-    o Generate
-    o Store, load (password-protected)
-    o Print for posterity
-    o Associate with roles.
-  o Code to generate timestamp files
-  o Code to generate mirror files
-  o Code to generate keylist files
-  o and add new keys to them
-  o and remove keys.
-
-o Repository code.
-  o make access functions independent of consistency/loading functions
-
 - Write client-side code
   . Decide early if a python implementation will do for v1.
-     - Adjust httplib, urllib2 to use socks4a.
-       - Check SOCKS package for suitability as basis for socks4a support?
+     o Adjust httplib, urllib2 to use socks4a.
+       o Check SOCKS package for suitability as basis for socks4a support?
      - Look into best packageing practices
 
-  o Write cacheing code
-  o Write code to pick a mirror
-  o Write code to grab a timestamp file and figure out what to do.
-  o Write code to update other files
   . Write code to run, telling another process about status,
     eventually coming up with a list of packages to install or an
     "A-OK" signal.
 
   D GUI
 
-  - DL-via-Tor
-  - Install-when-done
-  - Verbose output
-  - Rendezvous-back with Tor when done.
+  o DL-via-Tor
+  o Install-when-done
+  o Verbose output
+  - quiet output.
+  X Rendezvous-back with Tor when done.
+
+- Better configurability: let users override mirrors, keys, etc.
+- Backend for "A bunch of files you can unzip someplace."
+- OSX backend (hard).
+- Proper exponential backoff on backend.
 
 - Wrapping
   - More unit tests
-  o Setup.py script to install everything
 
 . Documentation
-  o HOWTO guides
+  - More comments, more tests
+  - Document EXE and RPM formats in HOWTO.
   . full pydoc
   - revise spec
 
 - Testing
   - Much bigger unit tests.
+

@@ -103,6 +103,7 @@ def insert(args):
             os.makedirs(parentDir, 0755)
         print "  Replacing file..."
         thandy.util.replaceFile(targetPath, content)
+        os.chmod(targetPath, 0644)
         print "  Done."
         n_ok += 1
     if n_ok != len(args):
@@ -171,6 +172,7 @@ def timestamp(args):
 
     content = json.dumps(signable, sort_keys=True)
     thandy.util.replaceFile(tsFname, content)
+    os.chmod(tsFname, 0644)
 
 def usage():
     print "Known commands:"
