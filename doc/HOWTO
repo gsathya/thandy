@@ -202,7 +202,9 @@ and notes:
     * All files that you replace are actually moved to ~/.thandy/old_files,
 
     * You should probably rebuild the timestamp immediately after replacing
-      the keys or mirrors files, since it will no longer match them.
+      the keys or mirrors files, since it will no longer match them. (You
+      can't make the timestamp until both the keys.txt and the mirrors.txt
+      are inserted.)
 
 .GENERATING TIMESTAMPS.
 
