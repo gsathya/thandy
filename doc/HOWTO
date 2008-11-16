@@ -69,7 +69,7 @@ paths in the repository.  Example roles are:
     # Give a key permission to sign the mirror list
     thandy-pk addrole {KEYID} mirrors /meta/mirrors.txt
 
-    # Give a key permission to sign the mirror list
+    # Give a key permission to sign the online timestamp file
     thandy-pk addrole {KEYID} timestamp /meta/timestamp.txt
 
     # Give a key permission to sign all packages in /pkginfo/tor/win32/*.txt
@@ -95,7 +95,7 @@ To export the public parts of a key and its roles, run:
     thandy-pk dumpkey {KEYID}
 
 To include the private portions of a key (so you can print it for a backup
-or something, run:
+or something), run:
 
     thandy-pk dumpkey --include-secret {KEYID}
 
