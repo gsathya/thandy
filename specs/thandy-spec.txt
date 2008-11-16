@@ -41,7 +41,7 @@
 
 0.3. Goals
 
-   Once Tor was a single executable that you could just run.  Then it
+   Once, Tor was a single executable that you could just run.  Then it
    required Privoxy.  Now, thanks to the Tor Browser Bundle and related
    projects, a full installation can contain Tor, Privoxy, Torbutton,
    Firefox, and more.
@@ -385,7 +385,7 @@
   directory is mirrored.  Their format is as in the keylist file.
 
   W is an integer used to weight mirrors when picking at random;
-  mirrors with more bandwidth should have higher weigths.   The
+  mirrors with more bandwidth should have higher weights.  The
   "official" element should only be present if the mirror is (one of
   the) official repositories operated by the Tor Project.
 
@@ -556,7 +556,7 @@
      - Bundle files may be added, but never replaced.
      - No file may be added unless it is syntactically valid and
        signed by a key in the keys file authorized to sign files of
-       this type in this file's location location.
+       this type in this file's location.
 
      - A package file may not be added unless all of its binary
        packages match their hashes.
@@ -567,7 +567,7 @@
      - When adding a new keylist, bundle, or mirrors list, the
        timestamp file must be regenerated immediately.
 
-5. Parameter setting and corner cases.
+5. Parameter setting and corner cases
 
 5.1. Timing
 
@@ -575,14 +575,14 @@
   SHOULD attempt to update every hour.  Clients SHOULD accept a
   timestamp file up to 6 hours old.
 
-5.2. Format versioning and forward-compatibility:
+5.2. Format versioning and forward-compatibility
 
   All of the above formats include the ability to add more
   attribute-value fields for backwards-compatible format changes.  If
   we need to make a backwards incompatible format change, we create a
   new filename for the new format.
 
-5.3. Key management and migration:
+5.3. Key management and migration
 
   Root keys should be kept offline.  All keys except timestamp and
   mirror keys should be stored encrypted.
