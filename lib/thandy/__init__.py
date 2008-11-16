@@ -34,3 +34,5 @@ class PubkeyFormatException(FormatException):
 class UnknownMethod(CryptoError):
     pass
 
+class DownloadError(Exception):
+    pass

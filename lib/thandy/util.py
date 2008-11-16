@@ -3,6 +3,7 @@
 import os
 import sys
 import tempfile
+import random
 
 try:
     import json
@@ -20,6 +21,7 @@ def moveFile(fromLocation, toLocation):
             os.unlink(toLocation)
         except OSError:
             pass
+
     os.rename(fromLocation, toLocation)
 
 
@@ -75,3 +77,21 @@ def getKeylist(keys_fname, checkKeys=True):
         keydb.addFromKeylist(obj['signed'], allowMasterKeys=False)
 
     return keydb
+
+def randChooseWeighted(lst):
+    """Given a list of (weight,item) tuples, pick an item with
+       probability proportional to its weight.
+    """
+
+    totalweight = sum(w for w,i in lst)
+    position = random.uniform(0, totalweight)
+    soFar = 0
+
+    # We could use bisect here, but this is not going to be in the
+    # critical path.  If it is, oops.
+    for w,i in lst:
+        soFar += w
+        if position < soFar:
+            return i
+
+    return lst[-1][1]

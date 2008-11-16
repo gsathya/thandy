@@ -33,11 +33,11 @@ def update(args):
 
     for f in files:
         # XXXX Use hash.
-        dj = thandy.download.DownloadJob(f, repo.getFilename(f),
-                                         mirrorlist)
+        dj = thandy.download.ThandyDownloadJob(f, repo.getFilename(f),
+                                               mirrorlist)
         downloader.addDownloadJob(dj)
         # XXXX replace file in repository if ok; reload; see what changed.
-    
+
     # Wait for in-progress jobs
 
 # Check my repository
@@ -47,6 +47,7 @@ def update(args):
 # Download stuff
 
 # Tell me what to install.
+
 
 def usage():
     print "Known commands:"
@@ -58,7 +59,7 @@ def main():
         usage()
     cmd = sys.argv[1]
     args = sys.argv[2:]
-    if cmd in [ "update" ]:
+    if cmd in [ "update", "geturls" ]:
         globals()[cmd](args)
     else:
         usage()

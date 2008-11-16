@@ -258,9 +258,9 @@ def getDigest(obj, digestObj=None):
         return digestObj.digest()
 
 def getFileDigest(f, digestObj=None):
-    """Update 'digestObj' (typically a SHA256 object) with the digest of
-       the file object in f.  If digestObj is none, compute the SHA256
-       hash and return it.
+    """Update 'digestObj' (typically a SHA256 object) with the digest
+       of the file object (or filename) in f.  If digestObj is none,
+       compute the SHA256 hash and return it.
 
        >>> s = "here is a long string"*1000
        >>> import cStringIO, Crypto.Hash.SHA256
@@ -271,15 +271,23 @@ def getFileDigest(f, digestObj=None):
        >>> h1.digest() == h2.digest()
        True
     """
+    f_to_close = None
+    if isinstance(f, basestring):
+        t_to_close = f = open(f, 'rb')
+
     useTempDigestObj = (digestObj == None)
     if useTempDigestObj:
         digestObj = Crypto.Hash.SHA256.new()
 
-    while 1:
-        s = f.read(4096)
-        if not s:
-            break
-        digestObj.update(s)
+    try:
+        while 1:
+            s = f.read(4096)
+            if not s:
+                break
+            digestObj.update(s)
+    finally:
+        if f_to_close != None:
+            f_to_close.close()
 
     if useTempDigestObj:
         return digestObj.digest()
