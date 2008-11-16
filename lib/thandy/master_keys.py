@@ -11,7 +11,7 @@ MASTER_KEYS = [
 
 DEFAULT_MIRRORLIST = {
   "mirrors": [ {'name'     :"master repository",
-                'urlbase'  :"http://updates.torproject.org/",
+                'urlbase'  :"http://updates.torproject.org/thandy/",
                 'contents' : ["/**"],
                 'weight'   : 1
                 }
