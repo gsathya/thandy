@@ -1,3 +1,10 @@
+- Bugs.
+  - Check hashes of downloaded packages and bundles as they are received.
+
+- Download improvements.
+  - Back off on download failure.
+  - Handle full stalled file in download.
+  - Use if-modified-since on timestamp
 
 - Write client-side code
   . Decide early if a python implementation will do for v1.
@@ -20,7 +27,7 @@
 - Better configurability: let users override mirrors, keys, etc.
 - Backend for "A bunch of files you can unzip someplace."
 - OSX backend (hard).
-- Proper exponential backoff on backend.
+- Proper exponential back-off on download backend.
 
 - Wrapping
   - More unit tests

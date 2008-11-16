@@ -390,7 +390,9 @@ class LocalRepository:
                 continue
 
             rp = binfo.getRelativePath()
-            hashDict[rp] = h_expected = binfo.getHash()
+            #hashDict[rp] =  #XXXX this hash needs to be calculated ovver
+            #                #     the json data.
+            h_expected = binfo.getHash()
             bfile = self.getBundleFile(rp)
             try:
                 bfile.load()
@@ -401,7 +403,8 @@ class LocalRepository:
 
             h_b = thandy.formats.getDigest(bfile.get())
             if h_b != h_expected:
-                logging.info("Bundle hash not as expected; must fetch.", rp)
+                logging.info("Bundle hash for %s not as expected; must fetch.",
+                             rp)
                 need.add(rp)
                 continue
 
@@ -422,7 +425,8 @@ class LocalRepository:
                 rp = pkginfo['path']
                 pfile = self.getPackageFile(rp)
                 h_expected = thandy.formats.parseHash(pkginfo['hash'])
-                hashDict[rp] = h_expected
+                #hashDict[rp] =  #XXXX this hash needs to be calculated ovver
+                #                #     the json data.
                 try:
                     pfile.load()
                 except OSError:
@@ -477,7 +481,7 @@ class LocalRepository:
                 fn = self.getFilename(rp)
                 try:
                     h_got = thandy.formats.getFileDigest(fn)
-                except OSError:
+                except (OSError, IOError):
                     logging.info("Installable file %s not found on disk; "
                                  "must load", rp)
                     need.add(rp)

@@ -273,7 +273,7 @@ def getFileDigest(f, digestObj=None):
     """
     f_to_close = None
     if isinstance(f, basestring):
-        t_to_close = f = open(f, 'rb')
+        f_to_close = f = open(f, 'rb')
 
     useTempDigestObj = (digestObj == None)
     if useTempDigestObj:
