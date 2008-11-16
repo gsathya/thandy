@@ -1,34 +1,48 @@
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
 import anydbm
+import atexit
 import shelve
 
 import thandy.util
 import thandy.formats
 
-class SimplePackageDB:
+import thandy.packagesys.PackageSystem
 
+class SimplePackageDB:
     def __init__(self, filename):
+        thandy.util.ensureParent(filename)
         self._db = anydbm.open(filename, 'c')
+        atexit.register(self.close)
+
+    def close(self):
+        self._db.close()
 
     def setVersion(self, package, version, filelist):
-        pass
+        self._db['pv_%s'%package] = (version, filelist)
 
     def setInstallParameters(self, package, params):
-        pass
+        self._db['ip_%s'%package] = params
 
     def getCurVersion(self, package):
-        pass
+        v = self._db.get('pv_%s'%package)
+        if v != None:
+            return v[0]
 
     def getInstallParameters(self, package):
-        pass
+        return self._db.get('pi_%s'%package)
 
+class DBBackedPackageSystem(thandy.packagesys.PackageSystem.PackageSystem):
+    def __init__(self):
+        self._packageDB = None
 
-class DBBackedPackageSystem(thandy.packagesys.PackageSystem):
-    def __init__(self, packageDB):
-        self._packageDB = packageDB
+    def getDB(self):
+        if self._packageDB is None:
+            fname = thandy.util.userFilename("db/packages")
+            self._packageDB = pdb.PackageDB(fname)
+        return self._packageDB
 
-class DBBackedPackageHandle(thandy.packagesys.PackageHandle):
+class DBBackedPackageHandle(thandy.packagesys.PackageSystem.PackageHandle):
     def __init__(self, packageDB, name, version, filelist):
         thandy.packagesys.PackageSystem.PackageHandle.__init__(self)
         self._packageDB = packageDB
@@ -68,14 +82,13 @@ class DBBackedPackageHandle(thandy.packagesys.PackageHandle):
             if not os.path.exists(fn):
                 all_ok = False
             else:
-                f = open(fn, 'rb')
                 try:
-                    try:
-                        d = thandy.formats.getFileDigest(f)
-                    except OSError:
+                    d = thandy.formats.getFileDigest(fn)
+                    if d != hash:
                         all_ok = False
-                        break
-                finally:
-                    f.close()
+                except OSError:
+                    all_ok = False
+                    break
+
 
         return all_ok

@@ -6,14 +6,39 @@ import os
 import rpm
 import md5
 
+import thandy.formats
+
 __all__ = [ 'RPMPackageSystem' ]
 
 class RPMPackageSystem(thandy.packagesys.PackageSystem.PackageSystem):
-    def getName(self):
-        return "RPM"
+    def __init__(self, repo):
+        self._repo = repo
 
-    def packageHandleFromJSON(self, json):
-        raise NotImplemented() # XXXX
+    def getName(self):
+        return "rpm"
+
+    def packageHandlesFromJSON(self, package):
+        if package['format'] != 'rpm':
+            raise thandy.FormatException()
+
+        handles = []
+        for entry in package['files']:
+            if len(entry) < 3:
+                continue
+            fn, h, extra = entry[:3]
+            name = os.path.split(fn)[1]
+
+            try:
+                version = extra['rpm_version']
+            except KeyError:
+                raise thandy.FormatException()
+
+            handles.append(RPMPackageHandle(name,
+                                            version,
+                                            fn,
+                                            self._repo.getFilename(fn)))
+
+        return handles
 
     def getTransaction(self):
         return RPMPackageTransaction()
@@ -115,7 +140,7 @@ def checkRPMInstall(name, version, ts=None):
                     logging.info("%s is missing or unreadable from %s %s; "
                                  "that's ok.", fname, name, h['version'])
                 else:
-                    logging.warn("%s is missing or unreadable from %s %s."
+                    logging.warn("%s is missing or unreadable from %s %s.",
                                  fname, name, h['version'])
                     all_ok = False
             elif haveMD5 == md5sum:
@@ -131,10 +156,14 @@ def checkRPMInstall(name, version, ts=None):
     return found and all_ok
 
 class RPMPackageHandle(thandy.packagesys.PackageSystem.PackageHandle):
-    def __init__(self, name, version, filename):
+    def __init__(self, name, version, relativePath, filename):
         self._name = name
         self._version = version
+        self._relPath = relativePath
         self._filename = filename
+
+    def getRelativePath(self):
+        return self._relPath
 
     def anyVersionInstalled(self, transaction=None):
         return len(getInstalledRPMVersions(self.name, transaction)) > 1

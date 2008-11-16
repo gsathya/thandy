@@ -1,10 +1,40 @@
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
+class PackageMetasystem:
+    def __init__(self, repository):
+        self._repostitory = repository
+        self._systems = {}
+
+    def addPackageSystem(self, system):
+        self._systems[system.getName()] = system
+
+    def getSysForPackage(self, pkg):
+        return self._systems.get(pkg['format'], None)
+
+    @staticmethod
+    def create(repository):
+        r = PackageMetasystem(repository)
+
+        try:
+            import rpm
+        except ImportError:
+            pass
+        else:
+            import thandy.packagesys.RPMPackages
+            r.addPackageSystem(thandy.packagesys.RPMPackages.RPMPackageSystem(
+                    repository))
+
+        import thandy.packagesys.ExePackages
+        r.addPackageSystem(thandy.packagesys.ExePackages.ExePackageSystem(
+                repository))
+
+        return r
+
 class PackageSystem:
     def getName(self):
         raise NotImplemented()
 
-    def packageHandleFromJSON(self, json):
+    def packageHandlesFromJSON(self, json):
         raise NotImplemented()
 
     def canBeAutomatic(self):
@@ -39,6 +69,9 @@ class PackageTransaction:
         self._transactions.append(packageHandle.remove)
 
 class PackageHandle:
+    def getRelativePath(self):
+        raise NotImplemented()
+
     def isInstalled(self, transaction=None):
         raise NotImplemented()
 

@@ -260,7 +260,7 @@ class LocalRepository:
                 needRole='bundle')
             return pkg
 
-    def getRequestedFile(self, relPath):
+    def getRequestedFile(self, relPath, pkgSystems=None):
         """DOCDOC"""
         for f in self._metafiles:
             if f.getRelativePath() == relPath:
@@ -279,12 +279,14 @@ class LocalRepository:
 
         return None
 
-    def getFilesToUpdate(self, now=None, trackingBundles=(), hashDict=None):
+    def getFilesToUpdate(self, now=None, trackingBundles=(), hashDict=None,
+                         pkgSystems=None, installableDict=None):
         """Return a set of relative paths for all files that we need
            to fetch.  Assumes that we care about the bundles
            'trackingBundles'.  If hashDict is provided, add mappings to it
            from the relative paths we want to fecth to the hashes that we
            want those items to have, when we know those hashes.
+           DOCDOC pkgSystems, installableDict
         """
 
         if now == None:
@@ -293,6 +295,9 @@ class LocalRepository:
         if hashDict == None:
             # Use a dummy hashdict.
             hashDict = {}
+
+        if installableDict == None:
+            installableDict = {}
 
         need = set()
 
@@ -444,8 +449,29 @@ class LocalRepository:
         # files?
         for pfile in packages.values():
             package = pfile.get()
+
+            alreadyInstalled = {}
+            allHandles = {}
+            if pkgSystems is not None:
+                psys = pkgSystems.getSysForPackage(package)
+                if psys is None:
+                    logging.info("No way to check whether a %s package is "
+                                 "up-to-date." % package['format'])
+                else:
+                    handles = psys.packageHandlesFromJSon(package)
+
+                    for h in handles:
+                        allHandles[h.getRelativePath()] = h
+                        if h.isInstalled():
+                            alreadyInstalled[h.getRelativePath()] = h
+
             for f in package['files']:
                 rp, h = f[:2]
+                if alreadyInstalled.has_key(rp):
+                    logging.info("%s is already installed; no need to download",
+                                 rp)
+                    continue
+
                 h_expected = thandy.formats.parseHash(h)
                 hashDict[rp] = h_expected
                 fn = self.getFilename(rp)
@@ -459,6 +485,9 @@ class LocalRepository:
                 if h_got != h_expected:
                     logging.info("Hash for %s not as expected; must load.", rp)
                     need.add(rp)
+                else:
+                    if allHandles.has_key(rp):
+                        installableDict[rp] = allHandles[rp]
 
         # Okay; these are the files we need.
         return need

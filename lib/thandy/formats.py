@@ -451,7 +451,8 @@ PACKAGE_SCHEMA = S.Obj(
             version=VERSION_SCHEMA,
             format=S.Obj(),
             ts=TIME_SCHEMA,
-            files=S.ListOf(S.Struct([RELPATH_SCHEMA, HASH_SCHEMA])),
+            files=S.ListOf(S.Struct([RELPATH_SCHEMA, HASH_SCHEMA],
+                                    allowMore=True)),
             shortdesc=S.DictOf(S.AnyStr(), S.AnyStr()),
             longdesc=S.DictOf(S.AnyStr(), S.AnyStr()))
 
@@ -612,22 +613,28 @@ def makePackageObj(config_fname, package_fname):
                         'format',
                         'location',
                         'relpath',
-                        ], (), preload)
+                        ], ['rpm_version', 'exe_args'], preload)
 
     f = open(package_fname, 'rb')
     digest = getFileDigest(f)
 
     # Check fields!
+    extra = {}
     result = { '_type' : "Package",
                'ts' : formatTime(time.time()),
                'name' : r['name'],
                'location' : r['location'], #DOCDOC
                'version' : r['version'],
                'format' : r['format'],
-               'files' : [ [ r['relpath'], formatHash(digest) ] ],
+               'files' : [ [ r['relpath'], formatHash(digest), extra ] ],
                'shortdesc' : shortDescs,
                'longdesc' : longDescs
              }
+
+    if format == 'rpm' and r.get('rpm_version'):
+        extra['rpm_version'] = r['rpm_version']
+    elif format == 'exe' and r.get('exe_args') != None:
+        extra['exe_args'] = r['exe_args']
 
     PACKAGE_SCHEMA.checkMatch(result)
 
