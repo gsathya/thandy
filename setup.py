@@ -124,7 +124,7 @@ setup(name='Thandy',
       author_email="nickm@freehaven.net",
       url="http://www.torproject/org",
       package_dir={ '' : 'lib' },
-      packages=['thandy'],
+      packages=['thandy', 'thandy.packagesys'],
       scripts=SCRIPTS,
       cmdclass={'install': InstallCommand},
 )
