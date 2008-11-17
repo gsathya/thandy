@@ -128,6 +128,20 @@ class RepositoryFile:
 
         return signed_obj, main_obj
 
+    def checkFile(self, fname, needhash=None):
+        f = open(fname, 'r')
+        try:
+            s = f.read()
+        finally:
+            f.close()
+
+        signed, main = self._checkContent(s)
+        if needhash:
+            d = thandy.formats.getDigest(main)
+            if d != needhash:
+                raise thandy.FormatException("Content didn't match needed "
+                                             "hash.")
+
     def load(self):
         """Load this object from disk if it hasn't already been loaded."""
         if self._main_obj == None:
@@ -186,8 +200,10 @@ class PkgFile:
     def getExpectedHash(self):
         return self._needHash
 
-    def checkFile(self):
-        return self._needHash == self._repository.getFileDigest()
+    def checkFile(self, fname, needHash=None):
+        if needHash:
+            if thandy.formats.getFileDigest(fname) != needHash:
+                raise thandy.FormatException("Digest for %s not as expected.")
 
 class LocalRepository:
     """Represents a client's partial copy of a remote mirrored repository."""
@@ -262,7 +278,7 @@ class LocalRepository:
 
     def getRequestedFile(self, relPath, pkgSystems=None):
         """DOCDOC"""
-        for f in self._metafiles:
+        for f in self._metaFiles:
             if f.getRelativePath() == relPath:
                 return f
         for f in self._bundleFiles.itervalues():
@@ -283,10 +299,8 @@ class LocalRepository:
                          pkgSystems=None, installableDict=None):
         """Return a set of relative paths for all files that we need
            to fetch.  Assumes that we care about the bundles
-           'trackingBundles'.  If hashDict is provided, add mappings to it
-           from the relative paths we want to fecth to the hashes that we
-           want those items to have, when we know those hashes.
-           DOCDOC pkgSystems, installableDict
+           'trackingBundles'.
+           DOCDOC pkgSystems, installableDict, hashDict
         """
 
         if now == None:
@@ -390,9 +404,8 @@ class LocalRepository:
                 continue
 
             rp = binfo.getRelativePath()
-            #hashDict[rp] =  #XXXX this hash needs to be calculated ovver
-            #                #     the json data.
             h_expected = binfo.getHash()
+            hashDict[rp] = h_expected
             bfile = self.getBundleFile(rp)
             try:
                 bfile.load()
@@ -425,8 +438,7 @@ class LocalRepository:
                 rp = pkginfo['path']
                 pfile = self.getPackageFile(rp)
                 h_expected = thandy.formats.parseHash(pkginfo['hash'])
-                #hashDict[rp] =  #XXXX this hash needs to be calculated ovver
-                #                #     the json data.
+                hashDict[rp] = h_expected
                 try:
                     pfile.load()
                 except OSError:

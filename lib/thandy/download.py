@@ -130,16 +130,18 @@ class DownloadManager:
 class DownloadJob:
     """Abstract base class.  Represents a thing to be downloaded, and the
        knowledge of how to download it."""
-    def __init__(self, targetPath, tmpPath, wantHash=None, useTor=False):
+    def __init__(self, targetPath, tmpPath, wantHash=None, repoFile=None,
+                 useTor=False):
         """Create a new DownloadJob.  When it is finally downloaded,
            store it in targetPath.  Store partial results in tmpPath;
            if there is already a file in tmpPath, assume that it is an
            incomplete download. If wantHash, reject the file unless
            the hash is as given.  If useTor, use a socks connection."""
-
+        #DOCDODC repofile
         self._destPath = targetPath
         self._tmpPath = tmpPath
         self._wantHash = wantHash
+        self._repoFile = repoFile
         self._useTor = useTor
 
         self._success = lambda : None
@@ -235,10 +237,12 @@ class DownloadJob:
             if f_out is not None:
                 f_out.close()
 
-        if self._wantHash:
+        if self._wantHash and not self._repoFile:
             gotHash = thandy.formats.getFileDigest(self._tmpPath)
             if gotHash != self._wantHash:
                 raise thandy.DownloadError("File hash was not as expected.")
+        elif self._repoFile:
+            self._repoFile.checkFile(self._tmpPath, self._wantHash)
 
         thandy.util.ensureParentDir(self._destPath)
         thandy.util.moveFile(self._tmpPath, self._destPath)
@@ -264,10 +268,10 @@ class ThandyDownloadJob(DownloadJob):
     """Thandy's subtype of DownloadJob: knows about mirrors, weighting,
        and Thandy's directory structure."""
     def __init__(self, relPath, destPath, mirrorList, wantHash=None,
-                 supportedURLTypes=None, useTor=None):
+                 supportedURLTypes=None, useTor=None, repoFile=None):
 
         DownloadJob.__init__(self, destPath, None, wantHash=wantHash,
-                             useTor=useTor)
+                             useTor=useTor, repoFile=repoFile)
         self._mirrorList = mirrorList
         self._relPath = relPath
 

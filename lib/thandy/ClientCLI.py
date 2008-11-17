@@ -18,12 +18,15 @@ def update(args):
     repoRoot = thandy.util.userFilename("cache")
     options, args = getopt.getopt(args, "", [ "repo=", "no-download",
                                               "loop", "no-packagesys",
-                                              "install", "socks-port="])
+                                              "install", "socks-port=",
+                                              "debug", "info",
+                                              "warn"])
     download = True
     keep_looping = False
     use_packagesys = True
     install = False
     socksPort = None
+    logLevel = logging.INFO
 
     for o, v in options:
         if o == '--repo':
@@ -38,6 +41,14 @@ def update(args):
             install = True
         elif o == "--socks-port":
             socksPort = int(v)
+        elif o == '--debug':
+            logLevel = logging.DEBUG
+        elif o == '--info':
+            logLevel = logging.INFO
+        elif o == '--warn':
+            logLevel = logging.WARN
+
+    logging.basicConfig(level=logLevel)
 
     if socksPort:
         thandy.socksurls.setSocksProxy("127.0.0.1", socksPort)
@@ -59,7 +70,7 @@ def update(args):
                                       installableDict=installable)
 
         if installable and not files:
-            logging.notice("Ready to install files: %s",
+            logging.info("Ready to install files: %s",
                            ", ".join(sorted(installable.keys())))
             if install:
                 # XXXX handle ordering
@@ -95,10 +106,12 @@ def update(args):
         downloader = thandy.download.DownloadManager()
 
         for f in files:
-            dj = thandy.download.ThandyDownloadJob(f, repo.getFilename(f),
-                                                   mirrorlist,
-                                                   wantHash=hashes.get(f),
-                                                   useTor=(socksPort!=None))
+            dj = thandy.download.ThandyDownloadJob(
+                f, repo.getFilename(f),
+                mirrorlist,
+                wantHash=hashes.get(f),
+                repoFile=repo.getRequestedFile(f),
+                useTor=(socksPort!=None))
 
             def successCb(rp=f):
                 rf = repo.getRequestedFile(rp)
@@ -108,10 +121,10 @@ def update(args):
 
             downloader.addDownloadJob(dj)
 
-        logging.info("Launching downloads")
+        logging.debug("Launching downloads")
         downloader.start()
 
-        logging.info("Waiting for downloads to finish.")
+        logging.debug("Waiting for downloads to finish.")
         downloader.wait()
         logging.info("All downloads finished.")
 
@@ -123,11 +136,10 @@ def usage():
     print "Known commands:"
     print "  update [--repo=repository] [--no-download] [--loop]"
     print "         [--no-packagesys] [--install] [--socks-port=port]"
+    print "         [--debug|--info|--warn]"
     sys.exit(1)
 
 def main():
-    #XXXX make this an option.
-    logging.basicConfig(level=logging.DEBUG)
 
     if len(sys.argv) < 2:
         usage()
