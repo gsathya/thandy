@@ -224,8 +224,9 @@ To generate a timestamp, run
     thandy-server timestamp
 
 If you're running a repository, you should have this in a crontab file,
-sat to run periodically.  Every 10-60 minutes would be fine, depending on
-your clients' settings.
+set to run periodically.  Every 10-60 minutes would be fine, depending on
+your clients' settings. For example,
+23,53 * * * *  PYTHONPATH=/home/thandy/updater-live/lib/ THANDY_MASTER_REPO=/home/thandy/public_html/thandy/ /home/thandy/updater-live/bin/thandy-server timestamp
 
 Note that the only bundles listed in a timestamp file are the ones under
 /bundleinfo/ in the repository.
