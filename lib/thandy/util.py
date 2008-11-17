@@ -109,3 +109,23 @@ def randChooseWeighted(lst):
 
     return lst[-1][1]
 
+def getRegistryValue(keyname):
+    """Read the contents of a Windows registry key from a given base."""
+
+    hkey, rest = keyname.split("\\", 1)
+    key, value = rest.rsplit("\\", 1)
+    if not hkey.startswith("HKEY_"):
+        return None
+
+    base = getattr(_winreg, hkey)
+    settings = None
+
+    try:
+        try:
+            settings = _winreg.OpenKey(base, key)
+            return _winreg.QueryValueEx(settings, value)[0]
+        except (WindowsError, ValueError, TypeError):
+            return None
+    finally:
+        if settings is not None:
+            settings.close()

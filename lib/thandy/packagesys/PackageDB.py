@@ -56,7 +56,7 @@ class DBBackedPackageHandle(thandy.packagesys.PackageSystem.PackageHandle):
         raise NotImplemented()
 
     def anyVersionInstalled(self, transaction=None):
-        return self._packageDB.getCurVersion(self._name) != None
+        return self.getInstalledVersion(transaction) != None
 
     def getInstalledVersion(self, transaction=None):
         return self._packageDB.getCurVersion(self._name)

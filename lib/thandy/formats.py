@@ -456,6 +456,18 @@ PACKAGE_SCHEMA = S.Obj(
             shortdesc=S.DictOf(S.AnyStr(), S.AnyStr()),
             longdesc=S.DictOf(S.AnyStr(), S.AnyStr()))
 
+def checkWinRegistryKeyname(keyname):
+    """Check keyname for superficial well-formedness as a win32 registry entry
+       name."""
+    hkey, rest = keyname.split("\\", 1)
+    key, value = rest.rsplit("\\", 1)
+    if hkey not in [ "HKEY_CURRENT_CONFIG",
+                     "HKEY_CURRENT_USER",
+                     "HKEY_LOCAL_MACHINE" ]:
+        raise thandy.FormatException("Bad hkey on registry entry.")
+    elif not key or not value:
+        raise thandy.FormatException("Bad registry entry.")
+
 ALL_ROLES = ('timestamp', 'mirrors', 'bundle', 'package', 'master')
 
 class Key:
@@ -613,7 +625,8 @@ def makePackageObj(config_fname, package_fname):
                         'format',
                         'location',
                         'relpath',
-                        ], ['rpm_version', 'exe_args'], preload)
+                        ], ['rpm_version', 'exe_args',
+                            'exe_registry_ent' ], preload)
 
     f = open(package_fname, 'rb')
     digest = getFileDigest(f)
@@ -633,12 +646,20 @@ def makePackageObj(config_fname, package_fname):
 
     if format == 'rpm':
         if not r.get('rpm_version'):
-            raise Thandy.FormatException("missing rpm_version value")
+            raise thandy.FormatException("missing rpm_version value")
         extra['rpm_version'] = r['rpm_version']
     elif format == 'exe':
         if not r.get('exe_args'):
-            raise Thandy.FormatException("missing exe_args value")
+            raise thandy.FormatException("missing exe_args value")
         extra['exe_args'] = r['exe_args']
+        if r.get('exe_registry_ent'):
+            if len(exe_registry_ent) != 2:
+                raise thandy.FormatException("Bad length on exe_registry_ent")
+            regkey, regval = r['exe_registry_ent']
+            checkWinRegistryKeyname(regkey)
+            if not isinstance(regval, basestring):
+                raise thandy.FormatException("Bad version on exe_registry_ent")
+            extra['registry_ent'] = [ regkey, regval ]
 
     PACKAGE_SCHEMA.checkMatch(result)
 
