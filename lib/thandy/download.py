@@ -142,8 +142,9 @@ class DownloadJob:
            store it in targetPath.  Store partial results in tmpPath;
            if there is already a file in tmpPath, assume that it is an
            incomplete download. If wantHash, reject the file unless
-           the hash is as given.  If useTor, use a socks connection."""
-        #DOCDODC repofile
+           the hash is as given.  If useTor, use a socks connection.
+           If repoFile, use that RepositoryFile to validate the downloaded
+           data."""
         self._destPath = targetPath
         self._tmpPath = tmpPath
         self._wantHash = wantHash
@@ -196,13 +197,15 @@ class DownloadJob:
             return False
 
     def _checkTmpFile(self):
-        """DOCDOC"""
+        """Helper: check whether the downloaded temporary file matches
+           the hash and/or format we need."""
         if self._wantHash and not self._repoFile:
             gotHash = thandy.formats.getFileDigest(self._tmpPath)
             if gotHash != self._wantHash:
                 raise thandy.DownloadError("File hash was not as expected.")
         elif self._repoFile:
             self._repoFile.checkFile(self._tmpPath, self._wantHash)
+
 
     def _download(self):
         # Implementation function.  Unlike download(), can throw exceptions.
@@ -215,7 +218,8 @@ class DownloadJob:
             except thandy.Exception:
                 pass
             else:
-                # What luck!  This file was what we wanted.
+                # What luck!  This stalled file was what we wanted.
+                # (This happens mostly with )
                 thandy.util.ensureParentDir(self._destPath)
                 thandy.util.moveFile(self._tmpPath, self._destPath)
                 return

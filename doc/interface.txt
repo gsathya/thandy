@@ -1,0 +1,45 @@
+
+
+
+
+
+Thandy client interface:
+
+   thandy-client update [options] [bundlename...]
+
+Recognized options are:
+
+   --repo=<dir>    Store downloaded, finished information under <dir>.
+                   Defaults to ~/.thandy/cache
+
+   --no-download   Only decide what to download; don't actually download
+                   anything.
+
+   --loop          Do not exit after we have nothing more to download; keep
+                   waiting until there's something to do.
+
+   --no-packagesys Do not ask any underlying package system about what
+                   versions of things are installed.  Assume we need to
+                   fetch all packages not in the cache.
+
+   --install       Try to install packages after downloading them.
+
+   --socks-port=<port>
+                   Run all network operations over the SOCKS4a server at
+                   localhost:<port>
+
+   --debug|--info|--warn
+                   Set logging severity.
+
+
+   --force-check
+                   Download a fresh version of the timestamp file, whether
+                   we need it or not.
+
+
+02:55 < nickm> Right now, for a quick-and-dirty thing, vidalia can notice the 
+               specific form of the "Ready to install files:" message.  It can 
+               turn into something more formal later.
+02:56 < nickm> The only 'suggestions' thandy-client understands now are ones 
+               from command-line options, all of which are documented.
+02:56 < armadev> ok

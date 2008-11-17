@@ -145,7 +145,7 @@ def usage():
     print "Known commands:"
     print "  update [--repo=repository] [--no-download] [--loop]"
     print "         [--no-packagesys] [--install] [--socks-port=port]"
-    print "         [--debug|--info|--warn]"
+    print "         [--debug|--info|--warn] [--force-check]"
     sys.exit(1)
 
 def main():

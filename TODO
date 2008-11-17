@@ -1,3 +1,6 @@
+03:07 < nickm> ok.  tomorrow morning I try to get messaging sorted, and try to
+               write up a registry-based exe version checker.
+
 - Download improvements.
   - Back off on download failure.
   - Handle full stalled file in download.

@@ -20,6 +20,9 @@ import thandy.keys
 import thandy.master_keys
 
 def moveFile(fromLocation, toLocation):
+    """Move the file from fromLocation to toLocation, removing any file
+       in toLocation.
+    """
     if sys.platform in ('cygwin', 'win32'):
         # Win32 doesn't let rename replace an existing file.
         try:
