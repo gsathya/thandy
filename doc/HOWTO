@@ -233,14 +233,16 @@ Note that the only bundles listed in a timestamp file are the ones under
 
 
 
+FROM THE CLIENT SIDE
+--------------------
 
+svn checkout https://svn.torproject.org/svn/updater/trunk updater
+cd updater
+make
+make test
+python setup.py install --prefix=/home/thandy/install
+export PYTHONPATH=/home/thandy/install/lib/
+export PATH=$PATH:`pwd`/install/bin/
 
-
-
-
-
-
-
-
-
+thandy-client update /bundleinfo/tor/source/
 
