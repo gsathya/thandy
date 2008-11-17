@@ -134,8 +134,8 @@ This will make a new keylist in "keys.txt".
 .MIRROR LISTS.
 
 Make a file like the one in sample/example-mirrors.txt, listing all the
-mirrors.  Make sure you have a key with a role like "mirrors
-/meta/mirrors.txt".  Run
+mirrors. The main repository counts as a mirror, so be sure to add it. Make
+sure you have a key with a role like "mirrors /meta/mirrors.txt". Run
 
    thandy-pk makemirrorlist {FILENAME}
 
