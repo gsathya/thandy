@@ -125,6 +125,8 @@ def update(args):
                 if rf != None:
                     rf.clear()
                     rf.load()
+            def failCb(): pass
+            dj.setCallbacks(successCb, failCb)
 
             downloader.addDownloadJob(dj)
 
