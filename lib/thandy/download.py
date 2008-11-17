@@ -189,16 +189,37 @@ class DownloadJob:
                          traceback.format_exc())
             return False
 
+    def _checkTmpFile(self):
+        """DOCDOC"""
+        if self._wantHash and not self._repoFile:
+            gotHash = thandy.formats.getFileDigest(self._tmpPath)
+            if gotHash != self._wantHash:
+                raise thandy.DownloadError("File hash was not as expected.")
+        elif self._repoFile:
+            self._repoFile.checkFile(self._tmpPath, self._wantHash)
+
     def _download(self):
         # Implementation function.  Unlike download(), can throw exceptions.
         f_in = f_out = None
+
+        haveStalled = self.haveStalledFile()
+        if haveStalled and self._wantHash:
+            try:
+                self._checkTmpFile()
+            except thandy.Exception:
+                pass
+            else:
+                # What luck!  This file was what we wanted.
+                thandy.util.ensureParentDir(self._destPath)
+                thandy.util.moveFile(self._tmpPath, self._destPath)
+                return
 
         try:
             url = self.getURL()
 
             logging.info("Downloading %s", url)
 
-            if self.haveStalledFile():
+            if haveStalled:
                 have_length = os.stat(self._tmpPath).st_size
                 logging.info("Have stalled file for %s with %s bytes", url,
                              have_length)
@@ -237,12 +258,7 @@ class DownloadJob:
             if f_out is not None:
                 f_out.close()
 
-        if self._wantHash and not self._repoFile:
-            gotHash = thandy.formats.getFileDigest(self._tmpPath)
-            if gotHash != self._wantHash:
-                raise thandy.DownloadError("File hash was not as expected.")
-        elif self._repoFile:
-            self._repoFile.checkFile(self._tmpPath, self._wantHash)
+        self._checkTmpFile()
 
         thandy.util.ensureParentDir(self._destPath)
         thandy.util.moveFile(self._tmpPath, self._destPath)
