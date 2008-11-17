@@ -40,6 +40,9 @@ class DownloadManager:
         for t in self.threads:
             t.setDaemon(True)
 
+        #DOCDOC
+        self._raiseMe = None
+
     def start(self):
         """Start all of this download manager's worker threads."""
         for t in self.threads:
@@ -79,6 +82,9 @@ class DownloadManager:
             self.done.acquire()
             self.done.wait()
             self.done.release()
+
+            if self._raiseMe:
+                raise self._raiseMe
 
             try:
                 while True:
@@ -233,7 +239,7 @@ class DownloadJob:
             gotRange = f_in.info().get("Content-Range")
             expectLength = f_in.info().get("Content-Length", "???")
             if gotRange:
-                if gotRange.startswith("bytes %s-"%(have_length+1)):
+                if gotRange.startswith("bytes %s-"%have_length):
                     logging.info("Resuming download from %s"%url)
                     f_out = open(self._tmpPath, 'a')
                 else:
@@ -344,7 +350,7 @@ def getConnection(url, useTor, have_length=None):
     is_http = urltype in ["http", "https"]
 
     if have_length is not None and is_http:
-        headers['Range'] = "bytes=%s-"%(have_length+1)
+        headers['Range'] = "bytes=%s-"%have_length
 
     req = urllib2.Request(url, headers=headers)
 

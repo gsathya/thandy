@@ -10,6 +10,11 @@ try:
 except ImportError:
     import simplejson as json
 
+try:
+    import _winreg
+except ImportError:
+    _winreg = None
+
 import thandy.formats
 import thandy.keys
 import thandy.master_keys
@@ -100,3 +105,4 @@ def randChooseWeighted(lst):
             return i
 
     return lst[-1][1]
+
