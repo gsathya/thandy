@@ -1,6 +1,3 @@
-- Bugs.
-  - Check hashes of downloaded packages and bundles as they are received.
-
 - Download improvements.
   - Back off on download failure.
   - Handle full stalled file in download.
@@ -34,7 +31,7 @@
 
 . Documentation
   - More comments, more tests
-  - Document EXE and RPM formats in HOWTO.
+  o Document EXE and RPM formats in HOWTO.
   . full pydoc
   - revise spec
 

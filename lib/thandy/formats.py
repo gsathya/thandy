@@ -631,9 +631,13 @@ def makePackageObj(config_fname, package_fname):
                'longdesc' : longDescs
              }
 
-    if format == 'rpm' and r.get('rpm_version'):
+    if format == 'rpm':
+        if not r.get('rpm_version'):
+            raise Thandy.FormatException("missing rpm_version value")
         extra['rpm_version'] = r['rpm_version']
-    elif format == 'exe' and r.get('exe_args') != None:
+    elif format == 'exe':
+        if not r.get('exe_args'):
+            raise Thandy.FormatException("missing exe_args value")
         extra['exe_args'] = r['exe_args']
 
     PACKAGE_SCHEMA.checkMatch(result)
