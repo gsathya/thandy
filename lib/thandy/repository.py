@@ -13,7 +13,7 @@ import os
 import threading
 import time
 
-MAX_TIMESTAMP_AGE = 24*60*60
+MAX_TIMESTAMP_AGE = 3*60*60
 
 class RepositoryFile:
     """Represents information about a file stored in our local repository

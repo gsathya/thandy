@@ -20,13 +20,14 @@ def update(args):
                                               "loop", "no-packagesys",
                                               "install", "socks-port=",
                                               "debug", "info",
-                                              "warn"])
+                                              "warn", "force-check"])
     download = True
     keep_looping = False
     use_packagesys = True
     install = False
     socksPort = None
     logLevel = logging.INFO
+    forceCheck = False
 
     for o, v in options:
         if o == '--repo':
@@ -47,6 +48,8 @@ def update(args):
             logLevel = logging.INFO
         elif o == '--warn':
             logLevel = logging.WARN
+        elif o == '--force-check':
+            forceCheck = True
 
     logging.basicConfig(level=logLevel)
 
@@ -68,6 +71,10 @@ def update(args):
         files = repo.getFilesToUpdate(trackingBundles=args, hashDict=hashes,
                                       pkgSystems=packagesys,
                                       installableDict=installable)
+
+        if forceCheck:
+            files.add("/meta/timestamp.txt")
+            forceCheck = False
 
         if installable and not files:
             logging.info("Ready to install files: %s",
