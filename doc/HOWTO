@@ -245,4 +245,6 @@ export PYTHONPATH=/home/thandy/install/lib/
 export PATH=$PATH:`pwd`/install/bin/
 
 thandy-client update /bundleinfo/tor/source/
+or
+thandy-client update --socks-port=9050 --debug /bundleinfo/tor/source/
 
