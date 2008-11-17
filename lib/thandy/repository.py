@@ -331,11 +331,12 @@ class LocalRepository:
         ts = self._timestampFile.get()
         if ts:
             age = now - thandy.formats.parseTime(ts['at'])
-            ts = thandy.formats.TimestampFile.fromJSon(ts)
             if age > MAX_TIMESTAMP_AGE:
                 logging.info("Timestamp file from %s is out of "
                              "date; must fetch it.", ts['at'])
                 need.add(self._timestampFile.getRelativePath())
+
+            ts = thandy.formats.TimestampFile.fromJSon(ts)
 
         # If the keylist isn't signed right, we can't check the
         # signatures on anything else.
