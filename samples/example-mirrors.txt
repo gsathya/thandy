@@ -2,6 +2,7 @@
 # Example mirror configuration file.
 #
 # Add a "Mirror" command like this for every mirror that you want to list.
+# Note: you need to list the main repository too.
 #
 # The "name" is a helpful name of the mirror.
 #
@@ -19,6 +20,7 @@
 # we should pick this mirror.
 
 Mirror(name="moria",
-       urlbase="http://moria.seul.org/thandy-example/",
+       urlbase="http://updates.torproject.org/thandy/",
        contents=[ "**" ],
        weight=1)
+
