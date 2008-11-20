@@ -61,6 +61,9 @@ def update(args):
     if use_packagesys:
         packagesys = thandy.packagesys.PackageSystem.PackageMetasystem.create(repo)
 
+    downloader = thandy.download.DownloadManager()
+    downloader.start()
+
     # XXXX We could make this loop way smarter.  Right now, it doesn't
     # back off between failures, and it doesn't notice newly downloadable files
     # until all downloading files are finished.
@@ -110,9 +113,24 @@ def update(args):
         if not mirrorlist:
             mirrorlist = thandy.master_keys.DEFAULT_MIRRORLIST
 
-        downloader = thandy.download.DownloadManager()
+        if files:
+            waitTill = min(downloader.getRetryTime(mirrorlist, f)
+                           for f in files)
+            now = time.time()
+            if waitTill > now:
+                delay = int(waitTill - now) + 1
+                logging.info("Waiting another %s seconds before we are willing "
+                             "to retry any mirror.", delay)
+                time.sleep(delay)
+                continue
 
+        logging.debug("Launching downloads")
+        now = time.time()
         for f in files:
+            if downloader.getRetryTime(mirrorlist, f) > now:
+                logging.info("Waiting a while before we fetch %s", f)
+                continue
+
             dj = thandy.download.ThandyDownloadJob(
                 f, repo.getFilename(f),
                 mirrorlist,
@@ -129,9 +147,6 @@ def update(args):
             dj.setCallbacks(successCb, failCb)
 
             downloader.addDownloadJob(dj)
-
-        logging.debug("Launching downloads")
-        downloader.start()
 
         logging.debug("Waiting for downloads to finish.")
         downloader.wait()
