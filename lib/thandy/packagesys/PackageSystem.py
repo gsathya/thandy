@@ -69,6 +69,9 @@ class PackageTransaction:
         self._transactions.append(packageHandle.remove)
 
 class PackageHandle:
+    def __init__(self):
+        pass
+
     def getRelativePath(self):
         raise NotImplemented()
 

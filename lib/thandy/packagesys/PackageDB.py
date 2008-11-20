@@ -11,7 +11,7 @@ import thandy.packagesys.PackageSystem
 
 class SimplePackageDB:
     def __init__(self, filename):
-        thandy.util.ensureParent(filename)
+        thandy.util.ensureParentDir(filename)
         self._db = anydbm.open(filename, 'c')
         atexit.register(self.close)
 
@@ -19,18 +19,18 @@ class SimplePackageDB:
         self._db.close()
 
     def setVersion(self, package, version, filelist):
-        self._db['pv_%s'%package] = (version, filelist)
+        self._db['pv_%s'%str(package)] = (version, filelist)
 
     def setInstallParameters(self, package, params):
-        self._db['ip_%s'%package] = params
+        self._db['ip_%s'%str(package)] = params
 
     def getCurVersion(self, package):
-        v = self._db.get('pv_%s'%package)
+        v = self._db.get('pv_%s'%str(package))
         if v != None:
             return v[0]
 
     def getInstallParameters(self, package):
-        return self._db.get('pi_%s'%package)
+        return self._db.get('pi_%s'%str(package))
 
 class DBBackedPackageSystem(thandy.packagesys.PackageSystem.PackageSystem):
     def __init__(self):
@@ -39,7 +39,7 @@ class DBBackedPackageSystem(thandy.packagesys.PackageSystem.PackageSystem):
     def getDB(self):
         if self._packageDB is None:
             fname = thandy.util.userFilename("db/packages")
-            self._packageDB = pdb.PackageDB(fname)
+            self._packageDB = SimplePackageDB(fname)
         return self._packageDB
 
 class DBBackedPackageHandle(thandy.packagesys.PackageSystem.PackageHandle):
@@ -61,7 +61,7 @@ class DBBackedPackageHandle(thandy.packagesys.PackageSystem.PackageHandle):
     def getInstalledVersion(self, transaction=None):
         return self._packageDB.getCurVersion(self._name)
 
-    def install(self):
+    def install(self, transaction=None):
         params = self._doInstall()
         self._packageDB.setCurVersion(
             self._name, self._version, self._filelist)
@@ -70,10 +70,10 @@ class DBBackedPackageHandle(thandy.packagesys.PackageSystem.PackageHandle):
     def _doInstall(self):
         raise NotImplemented()
 
-    def isInstalled(self):
-        return self.getInstalledVersion(self, transaction) == self._version
+    def isInstalled(self, transaction=None):
+        return self.getInstalledVersion(transaction) == self._version
 
-    def checkInstall(self):
+    def checkInstall(self, transaction=None):
         base = self._getInstallBase()
 
         all_ok = True

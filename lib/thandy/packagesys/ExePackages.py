@@ -8,6 +8,7 @@ import thandy.packagesys.PackageDB as pdb
 
 class ExePackageSystem(pdb.DBBackedPackageSystem):
     def __init__(self, repo):
+        pdb.DBBackedPackageSystem.__init__(self)
         self._repo = repo
 
     def getName(self):
@@ -31,7 +32,7 @@ class ExePackageSystem(pdb.DBBackedPackageSystem):
                                  [],  # filelist not implemented in this.
                                  rp,
                                  self._repo.getFilename(rp),
-                                 arguments=extra['exe_args'],
+                                 arguments=extra.get('exe_args', []),
                                  registry_ent=extra.get('registry_ent')))
         return handles
 
@@ -44,7 +45,7 @@ class ExePackageSystem(pdb.DBBackedPackageSystem):
 class ExePackageHandle(pdb.DBBackedPackageHandle):
     def __init__(self, packageDB, name, version, filelist, relpath, filename,
                  arguments, registry_ent=None):
-        pdb.DBBackedPackageHandle.__init__(packageDB, name, version, filelist)
+        pdb.DBBackedPackageHandle.__init__(self, packageDB, name, version, filelist)
         self._relPath = relpath
         self._filename = filename
         self._arguments = arguments
