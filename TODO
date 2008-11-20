@@ -41,3 +41,52 @@
 - Testing
   - Much bigger unit tests.
 
+- Bugs Roger keeps noticing
+  - you can add the same role to a key twice.
+  - wishlist item: thandy-pk dumpkey-all
+
+- Confusing tracebacks that could use a check and error message:
+
+If you type the wrong password,
+Traceback (most recent call last):
+  File "/home/thandy/updater-live/lib/python2.4/site-packages/thandy/SignerCLI.p
+y", line 313, in ?
+    main()
+  File "/home/thandy/updater-live/lib/python2.4/site-packages/thandy/SignerCLI.p
+y", line 308, in main
+    globals()[cmd](args)
+  File "/home/thandy/updater-live/lib/python2.4/site-packages/thandy/SignerCLI.p
+y", line 202, in keygen
+    k.load()
+  File "/home/thandy/updater-live//lib/python2.4/site-packages/thandy/keys.py", 
+line 385, in load
+    contents = decryptSecret(contents, password)
+  File "/home/thandy/updater-live//lib/python2.4/site-packages/thandy/keys.py", 
+line 343, in decryptSecret
+    raise thandy.BadPassword()
+thandy.BadPassword
+
+when your ~/.thandy/timestamp_key didn't get the secret key dumped too,
+thandy@moria:~$ thandy-server timestamp
+Traceback (most recent call last):
+  File "/home/thandy/updater-live/lib/python2.4/site-packages/thandy/ServerCLI.p
+y", line 191, in ?
+    main()
+  File "/home/thandy/updater-live/lib/python2.4/site-packages/thandy/ServerCLI.p
+y", line 186, in main
+    globals()[cmd](args)
+  File "/home/thandy/updater-live/lib/python2.4/site-packages/thandy/ServerCLI.p
+y", line 166, in timestamp
+    keylist = thandy.formats.makeKeylistObj(ts_keyfile, True)
+  File "/home/thandy/updater-live//lib/python2.4/site-packages/thandy/formats.py
+", line 752, in makeKeylistObj
+    klist.append({'key': k.format(private=includePrivate), 'roles' : k.getRoles(
+) })
+  File "/home/thandy/updater-live//lib/python2.4/site-packages/thandy/keys.py", 
+line 189, in format
+    result['d'] = intToBase64(self.key.d)
+  File "/usr/lib/python2.4/site-packages/Crypto/PublicKey/RSA.py", line 154, in 
+__getattr__
+    return getattr(self.key, attr)
+AttributeError: rsaKey instance has no attribute 'd'
+
