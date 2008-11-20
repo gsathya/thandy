@@ -22,11 +22,11 @@ class ExePackageSystem(pdb.DBBackedPackageSystem):
             if len(entry) < 3:
                 continue
             rp, h, extra = entry[:3]
-            version = package['version']
+            version = pkg['version']
 
             handles.append(
                 ExePackageHandle(self.getDB(),
-                                 package['name'],
+                                 pkg['name'],
                                  version,
                                  [],  # filelist not implemented in this.
                                  rp,
@@ -75,5 +75,4 @@ class ExePackageHandle(pdb.DBBackedPackageHandle):
         logging.info("Installing %s.  Command line: %s", self._filename,
                      commandLine)
         subprocess.call(commandline)
-
 
