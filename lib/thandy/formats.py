@@ -644,6 +644,7 @@ def makePackageObj(config_fname, package_fname):
                'longdesc' : longDescs
              }
 
+    format = r['format']
     if format == 'rpm':
         if not r.get('rpm_version'):
             raise thandy.FormatException("missing rpm_version value")
