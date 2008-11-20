@@ -475,7 +475,7 @@ class LocalRepository:
                     logging.info("No way to check whether a %s package is "
                                  "up-to-date." % package['format'])
                 else:
-                    handles = psys.packageHandlesFromJSon(package)
+                    handles = psys.packageHandlesFromJSON(package)
 
                     for h in handles:
                         allHandles[h.getRelativePath()] = h
