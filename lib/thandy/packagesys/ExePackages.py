@@ -64,7 +64,7 @@ class ExePackageHandle(pdb.DBBackedPackageHandle):
     def isInstalled(self, transaction=None):
         if self._registry_ent != None:
             ver = thandy.util.getRegistryValue(self._registry_ent[0])
-            if ver == self._registry_ent[1]
+            if ver == self._registry_ent[1]:
                 return True
         else:
             return pdb.DBBackedPackageHandle.isInstalled(self, transaction)
