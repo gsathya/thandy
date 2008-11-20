@@ -111,7 +111,10 @@ class DownloadManager:
         self.downloadQueue.put(job)
 
     def getRetryTime(self, mirrorList, relPath):
-        """DOCDOC"""
+        """Given a mirrorlist and a filename relative to the repository root,
+           return the next time at which we are willing to retry fetching
+           that file from any mirror, or 0 if we are willing to try immediately.
+        """
         readyAt = None
         for m in mirrorsThatSupport(mirrorList, relPath):
             r = self.statusLog.getDelayTime(m['urlbase'])
@@ -123,8 +126,8 @@ class DownloadManager:
             return 0
 
     def downloadFailed(self, mirror, relpath):
-        """DOCDOC"""
-        pass # Track failure; don't try the same mirror right away.
+        """Callback: invoked when a download fails."""
+        pass
 
     def _thread(self, idx):
         # Run in the background per thread.  idx is the number of the thread.
@@ -158,27 +161,35 @@ class DownloadManager:
                 self.done.release()
 
 class DownloadFailure:
-    # Broadly speaking, these errors are possible:
-    #
-    #  A - The whole internet is down for us, either because our network
-    #      connection sucks, our proxy is down, or whatever.
-    #    - A particular mirror is down or nonfunctional.
-    #
-    #      DownloadFailure.connectionFailed()
-    #
-    #  B - The mirror is giving us errors we don't understand.
-    #    - A particular mirror is missing a file we need.
-    #    - A particular mirror served us something that was allegedly a
-    #      file we need, but that file was no good.
-    #
-    #      DownloadFailure.mirrorFailed()
-    #
-    #  C - We finished a partial download and it was no good, but we
-    #      can't tell who was at fault, because we don't know which
-    #      part was corrupt.
-    #
-    #      DownloadFailure.badCompoundFile()
-    #
+    """Helper class: represents a failure to download an item from a
+       mirror.
+
+       Broadly speaking, these errors are possible:
+
+       A - The whole internet is down for us, either because our network
+           connection sucks, our proxy is down, or whatever.
+         - A particular mirror is down or nonfunctional.
+
+           For these, use DownloadFailure.connectionFailed(): we can't
+           easily tell a mirror failure from a network failure when we
+           have only a single mirror to look at.
+
+       B - The mirror is giving us errors we don't understand.
+         - A particular mirror is missing a file we need.
+         - A particular mirror served us something that was allegedly a
+           file we need, but that file was no good.
+
+           For these, use DownloadFailure.mirrorFailed(): Whether the
+           mirror is broken or we're misunderstanding it, don't try
+           to use it for a while.
+
+       C - We finished a partial download and it was no good, but we
+           can't tell who was at fault, because we don't know which
+           part was corrupt.
+
+           Use DownloadFailure.badCompoundFile().  We don't know who
+           to blame, so we treat the whole network as having gone bibbledy.
+    """
     def __init__(self, urlbase, relPath, networkError=False):
         self._urlbase = urlbase
         self._relPath = relPath
@@ -199,25 +210,35 @@ class DownloadFailure:
         return DownloadFailure(urlbase, None, True)
 
 S = thandy.checkJson
-_FAIL_SCHEMA = S.Struct([S.Int(), S.Int()], allowMore=True)
+_FAIL_SCHEMA = S.Struct([S.Int(), thandy.formats.TIME_SCHEMA], allowMore=True)
 _STATUS_LOG_SCHEMA = S.Obj(
     v=S.Int(),
     mirrorFailures=S.DictOf(S.AnyStr(), _FAIL_SCHEMA),
     networkFailures=_FAIL_SCHEMA)
 del S
 
+
 class DownloadStatusLog:
-    """DOCDOC"""
+    """Tracks when we can retry downloading from various mirrors.
+
+       Currently, we treat every failure as affecting a mirror, the
+       network, or both.  When a mirror or the network fails, we back
+       off for a while before we attempt it again.  For each failure
+       with no intervening success, we back off longer.
+    """
     # XXXX get smarter.
     # XXXX make this persistent.
     def __init__(self, mirrorFailures={}, networkFailures=[0,0]):
         self._lock = threading.RLock()
-        # urlbase -> [ nFailures, dontTryUntil ]
+        # Map from urlbase to [ nFailures, lastFailureTime ]
         self._mirrorFailures = dict(mirrorFailures)
-        # None, or [ nFailures, dontTryUntil ]
+        # [ nFailures, lastFailureTime ] for the network as a while.
         self._netFailure = list(networkFailures)
 
     def _getDelay(self, isMirror, failureCount):
+        """Return how long we should wait since the 'failureCount'th
+           consecutive failure of something before we try it again.
+           If isMirror, it's a mirror.  Otherwise, it's the network."""
         if isMirror:
             DELAYS = [ 0, 300, 300, 600, 900, 8400, 8400, 9000 ]
         else:
@@ -229,17 +250,28 @@ class DownloadStatusLog:
             return DELAYS[-1]
 
     def toJSON(self):
+        """Return an object suitable for encoding with json to represent the
+           state of this DownloadStatusLog."""
+        def formatEnt(e):
+            return [ e[0], thandy.formats.formatTime(e[1]) ]
         return { 'v': 1,
-                 'networkFailures' : self._netFailure,
-                 'mirrorFailures' : self._mirrorFailures }
+                 'networkFailures' : formatEnt(self._netFailure),
+                 'mirrorFailures' :
+                 dict((k, formatEnt(v)) for k, v
+                      in self._mirrorFailures.iteritems())
+                 }
 
     @staticmethod
     def fromJSON(obj):
         _STATUS_LOG_SCHEMA.checkMatch(obj)
-        return DownloadStatusLog( obj['mirrorFailures'],
-                                  obj['networkFailures'] )
+        def parseEnt(e):
+            return [ e[0], thandy.formats.parseTime(e[1]) ]
+        return DownloadStatusLog( dict((k, parseEnt(v)) for k,v
+                                        in obj['mirrorFailures'].iteritems()),
+                                  parseEnt(obj['networkFailures']))
 
     def failed(self, failure):
+        """Note that 'failure', a DownloadFailure object, has occurred."""
         self._lock.acquire()
         try:
             when = long(failure._when)
@@ -247,7 +279,13 @@ class DownloadStatusLog:
             # If there's a mirror to blame, blame it.
             if failure._urlbase != None:
                 s = self._mirrorFailures.setdefault(failure._urlbase, [0, 0])
-                if s[1] + 5 < when: # Two failures within 5s count as one.
+                # XXXX This "+ 5" business is a hack.  The idea is to keep
+                # multiple failure within 5 seconds from counting as one,
+                # since it's common for us to launch multiple downloads
+                # simultaneously.  If we launch 3, and they all fail because
+                # the network is down, we want that to count as 1 failure,
+                # not 3.
+                if s[1] + 5 < when:
                     s[0] += 1
                     s[1] = when
 
@@ -255,13 +293,16 @@ class DownloadStatusLog:
             # blame the network too.
             if failure._urlbase == None or failure._network:
                 s = self._netFailure
-                if s[1] + 5 < when: # Two failures within 5s count as one.
+                # see note above.
+                if s[1] + 5 < when:
                     s[0] += 1
                     s[1] = when
         finally:
             self._lock.release()
 
     def succeeded(self, urlbase, url):
+        """Note that we have successfully fetched url from the mirror
+           at urlbase."""
         self._lock.acquire()
         try:
             try:
@@ -273,6 +314,7 @@ class DownloadStatusLog:
             self._lock.release()
 
     def canRetry(self, urlbase=None, now=None):
+        """Return True iff we are willing to retry the mirror at urlbase."""
         if now == None:
             now = time.time()
 
@@ -280,6 +322,8 @@ class DownloadStatusLog:
         return d <= now
 
     def getDelayTime(self, urlbase=None):
+        """Return the time after which we're willing to retry fetching from
+           urlbase.  0 also means "we're ready now". """
         self._lock.acquire()
         try:
             readyAt = 0
@@ -320,7 +364,9 @@ class DownloadJob:
         self._failure = lambda : None
 
     def setCallbacks(self, success, failure):
-        """DOCDOC"""
+        """Make sure that 'success' gets called if this download succeeds,
+           and 'failure' gets called when it fails.  Both are called from the
+           downloader thread, so make sure to be threadsafe."""
         self._success = success
         self._failure = failure
 
@@ -330,7 +376,8 @@ class DownloadJob:
         raise NotImplemented()
 
     def getMirror(self):
-        """DOCDOC"""
+        """Return a string identifying the mirror that's doing the downloading,
+           if we know it."""
         return None
 
     def getRelativePath(self):
@@ -349,7 +396,8 @@ class DownloadJob:
 
     def download(self):
         """Main interface function: Start the download, and return
-           when complete. DOCDOC return value.
+           when complete.  Return None on success, and a
+           DownloadFailure on failure.
         """
         try:
             self._download()
@@ -375,7 +423,10 @@ class DownloadJob:
             return DownloadFailure.connectionFailed(None)
 
     def setDownloadStatusLog(self, log):
-        """DOCDOC"""
+        """Base our URL-picking decisions on the DownloadStatusLog in
+           'log'.  The caller is still reposnsible for invoking the
+           logs failed() or succeeded methods.  XXXX is that bad API
+           design?"""
         pass
 
     def _checkTmpFile(self):
@@ -492,6 +543,10 @@ class SimpleDownloadJob(DownloadJob):
         return self._url
 
 def mirrorsThatSupport(mirrorList, relPath, urlTypes=None, statusLog=None):
+    """Generator: yields all the mirrors from mirrorList that let us
+       fetch from relPath, whose URL type is in urlTypes (if present),
+       and who are not marked as failed-too-recently in statusLog (if
+       present)."""
     now = time.time()
     for m in mirrorList['mirrors']:
         if urlTypes != None:

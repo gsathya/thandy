@@ -46,24 +46,29 @@ def replaceFile(fname, contents, textMode=False):
     moveFile(fname_tmp, fname)
 
 def userFilename(name):
+    """Return a path relative to $THANDY_HOME or ~/.thandy whose final path
+       component is 'name', creating parent directories as needed."""
     try:
         base = os.environ["THANDY_HOME"]
     except KeyError:
         base = "~/.thandy"
-    base = os.path.expanduser(base)
-    if not os.path.exists(base):
-        os.makedirs(base, 0700)
-    return os.path.normpath(os.path.join(base, name))
+
+    result = os.path.normpath(os.path.join(base, name))
+    ensureParentDir(result)
+    return result
 
 def ensureParentDir(name):
-    """DOCDOC"""
+    """If the parent directory of 'name' does not exist, create it."""
     directory = os.path.split(name)[0]
     if not os.path.exists(directory):
         os.makedirs(directory, 0700)
 
 def getKeylist(keys_fname, checkKeys=True):
-    import thandy.master_keys
-
+    """Return a Keylist() containing all the keys in master_keys, plus
+       all the keys in $THANDY_HOME.preload_keys, plus all the keys stored
+       in keys_fname.  If check_keys, exclude from keys_fname any keys not
+       signed by enough master keys.  Do not allow master keys to occur in
+       keys_fname."""
     keydb = thandy.formats.Keylist()
 
     for key in thandy.master_keys.MASTER_KEYS:
@@ -110,6 +115,8 @@ def randChooseWeighted(lst):
     return lst[-1][1]
 
 class NoRegistry(thandy.Exception):
+    """Exception raised when we try to access the registry on a
+       non-win32 machine."""
     pass
 
 def getRegistryValue(keyname):
