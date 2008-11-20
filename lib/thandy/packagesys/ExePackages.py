@@ -1,6 +1,7 @@
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
 import subprocess
+import logging
 
 import thandy.util
 import thandy.packagesys.PackageSystem as ps
@@ -74,6 +75,6 @@ class ExePackageHandle(pdb.DBBackedPackageHandle):
     def _doInstall(self):
         commandline = [ self._filename ] + self._arguments
         logging.info("Installing %s.  Command line: %s", self._filename,
-                     commandLine)
+                     commandline)
         subprocess.call(commandline)
 
