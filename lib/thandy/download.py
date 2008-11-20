@@ -245,12 +245,12 @@ class DownloadJob:
             if gotRange:
                 if gotRange.startswith("bytes %s-"%have_length):
                     logging.info("Resuming download from %s"%url)
-                    f_out = open(self._tmpPath, 'a')
+                    f_out = open(self._tmpPath, 'ab')
                 else:
                     raise thandy.DownloadError("Got an unexpected range %s"
                                                %gotRange)
             else:
-                f_out = open(self._tmpPath, 'w')
+                f_out = open(self._tmpPath, 'wb')
 
             total = 0
             while True:
