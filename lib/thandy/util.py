@@ -53,7 +53,7 @@ def userFilename(name):
     base = os.path.expanduser(base)
     if not os.path.exists(base):
         os.makedirs(base, 0700)
-    return os.path.join(base, name)
+    return os.path.normpath(os.path.join(base, name))
 
 def ensureParentDir(name):
     """DOCDOC"""

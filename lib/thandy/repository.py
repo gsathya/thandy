@@ -195,7 +195,8 @@ class PkgFile:
         return self._relativePath
 
     def getPath(self):
-        return self._repository.getFilename(self._relativePath)
+        fname = self._repository.getFilename(self._relativePath)
+        return os.path.normpath(fname)
 
     def getExpectedHash(self):
         return self._needHash
