@@ -128,4 +128,4 @@ def getRegistryValue(keyname):
             return None
     finally:
         if settings is not None:
-            settings.close()
+            settings.Close()
