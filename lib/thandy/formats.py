@@ -654,7 +654,7 @@ def makePackageObj(config_fname, package_fname):
             raise thandy.FormatException("missing exe_args value")
         extra['exe_args'] = r['exe_args']
         if r.get('exe_registry_ent'):
-            if len(exe_registry_ent) != 2:
+            if len(r['exe_registry_ent']) != 2:
                 raise thandy.FormatException("Bad length on exe_registry_ent")
             regkey, regval = r['exe_registry_ent']
             checkWinRegistryKeyname(regkey)
