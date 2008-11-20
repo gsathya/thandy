@@ -57,19 +57,25 @@ class ExePackageHandle(pdb.DBBackedPackageHandle):
 
     def getInstalledVersion(self, transaction=None):
         if self._registry_ent != None:
-            ver = thandy.util.getRegistryValue(self._registry_ent[0])
-            if ver != None:
-                return ver
-        else:
-            return pdb.DBBackedPackageHandle.getInstalledVersion(self, transaction)
+            try:
+                ver = thandy.util.getRegistryValue(self._registry_ent[0])
+                if ver != None:
+                    return ver
+            except thandy.util.NoRegistry:
+                pass
+
+        return pdb.DBBackedPackageHandle.getInstalledVersion(self, transaction)
 
     def isInstalled(self, transaction=None):
         if self._registry_ent != None:
-            ver = thandy.util.getRegistryValue(self._registry_ent[0])
-            if ver == self._registry_ent[1]:
-                return True
-        else:
-            return pdb.DBBackedPackageHandle.isInstalled(self, transaction)
+            try:
+                ver = thandy.util.getRegistryValue(self._registry_ent[0])
+                if ver == self._registry_ent[1]:
+                    return True
+            except thandy.util.NoRegistry:
+                pass
+
+        return pdb.DBBackedPackageHandle.isInstalled(self, transaction)
 
 
     def _doInstall(self):

@@ -109,8 +109,13 @@ def randChooseWeighted(lst):
 
     return lst[-1][1]
 
+class NoRegistry(thandy.Exception):
+    pass
+
 def getRegistryValue(keyname):
     """Read the contents of a Windows registry key from a given base."""
+    if _winreg is None:
+        raise NoRegistry()
 
     hkey, rest = keyname.split("\\", 1)
     key, value = rest.rsplit("\\", 1)
