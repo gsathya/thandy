@@ -70,8 +70,7 @@ class ExePackageHandle(pdb.DBBackedPackageHandle):
         if self._registry_ent != None:
             try:
                 ver = thandy.util.getRegistryValue(self._registry_ent[0])
-                if ver == self._registry_ent[1]:
-                    return True
+                return ver == self._registry_ent[1]
             except thandy.util.NoRegistry:
                 pass
 
