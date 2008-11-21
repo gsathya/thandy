@@ -790,6 +790,9 @@ def makeKeylistObj(keylist_fname, includePrivate=False):
     klist = []
     for k in keys:
         k = thandy.keys.RSAKey.fromJSon(k)
+        if includePrivate and not k.isPrivateKey():
+            raise thandy.FormatException("Private key information not found.")
+
         klist.append({'key': k.format(private=includePrivate), 'roles' : k.getRoles() })
 
     result = { '_type' : "Keylist",

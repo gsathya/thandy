@@ -305,7 +305,10 @@ def main():
     if cmd in [ "keygen", "listkeys", "addrole", "delrole", "chpass",
                 "dumpkey", "makepackage", "makebundle", "signkeylist",
                 "makekeylist", "signkeylist", "makemirrorlist", ]:
-        globals()[cmd](args)
+        try:
+            globals()[cmd](args)
+        except thandy.BadPassword:
+            print >>sys.stderr, "Password incorrect."
     else:
         usage()
 

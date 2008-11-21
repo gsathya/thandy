@@ -47,7 +47,8 @@ class PublicKey:
            paths.
         """
         assert role in thandy.formats.ALL_ROLES
-        self._roles.append((role, path))
+        if (role, path) not in self._roles:
+            self._roles.append((role, path))
     def clearRoles(self):
         """Remove all roles from this key."""
         del self._roles[:]
