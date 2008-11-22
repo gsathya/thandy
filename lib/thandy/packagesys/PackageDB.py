@@ -63,7 +63,7 @@ class DBBackedPackageHandle(thandy.packagesys.PackageSystem.PackageHandle):
 
     def install(self, transaction=None):
         params = self._doInstall()
-        self._packageDB.setCurVersion(
+        self._packageDB.setVersion(
             self._name, self._version, self._filelist)
         self._packageDB.setInstallParameters(self._name, params)
 
