@@ -1,6 +1,5 @@
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
-import anydbm
 import atexit
 import shelve
 
@@ -12,7 +11,7 @@ import thandy.packagesys.PackageSystem
 class SimplePackageDB:
     def __init__(self, filename):
         thandy.util.ensureParentDir(filename)
-        self._db = anydbm.open(filename, 'c')
+        self._db = shelve.open(filename, 'c')
         atexit.register(self.close)
 
     def close(self):
