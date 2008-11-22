@@ -99,6 +99,9 @@ or something), run:
 
     thandy-pk dumpkey --include-secret {KEYID}
 
+You can list as many or as few keys as you want.  To dump _all_ keys, just
+omit the KEYID.
+
 Generally speaking, you want to figure out what keys get what roles _before_
 you start making the first keylist; otherwise you'll probably need to
 re-export them.

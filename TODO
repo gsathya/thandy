@@ -1,18 +1,19 @@
-03:07 < nickm> ok.  tomorrow morning I try to get messaging sorted, and try to
-               write up a registry-based exe version checker.
+- get messaging sorted
+o try to write up a registry-based exe version checker.,
+- Decouple install from check: they are not necessarily related.
 
-- Download improvements.
-  - Back off on download failure.
-  - Handle full stalled file in download.
+. Download improvements.
+  o Back off on download failure.
+  o Handle full stalled file in download.
   - Use if-modified-since on timestamp
 
-- Write client-side code
-  . Decide early if a python implementation will do for v1.
+o Write client-side code
+  o Decide early if a python implementation will do for v1.
      o Adjust httplib, urllib2 to use socks4a.
        o Check SOCKS package for suitability as basis for socks4a support?
-     - Look into best packageing practices
+     o Look into best packaging practices
 
-  . Write code to run, telling another process about status,
+  o Write code to run, telling another process about status,
     eventually coming up with a list of packages to install or an
     "A-OK" signal.
 
@@ -21,7 +22,7 @@
   o DL-via-Tor
   o Install-when-done
   o Verbose output
-  - quiet output.
+  o quiet output.
   X Rendezvous-back with Tor when done.
 
 - Better configurability: let users override mirrors, keys, etc.
@@ -41,9 +42,10 @@
 - Testing
   - Much bigger unit tests.
 
-- Bugs Roger keeps noticing
-  - you can add the same role to a key twice.
-  - wishlist item: thandy-pk dumpkey-all
+o Bugs Roger keeps noticing
+  o you can add the same role to a key twice.
+  o wishlist item: thandy-pk dumpkey-all
+    o Already there: Run "thandy-pk dumpkey" with no arguments
 
 - Confusing tracebacks that could use a check and error message:
 
@@ -65,6 +67,10 @@ line 385, in load
 line 343, in decryptSecret
     raise thandy.BadPassword()
 thandy.BadPassword
+
+   [ I maintain that BadPassword _is_ an error message.  I'll make it say
+     "Password Incorrect", though, so it looks less like a bug.]
+
 
 when your ~/.thandy/timestamp_key didn't get the secret key dumped too,
 thandy@moria:~$ thandy-server timestamp
@@ -90,3 +96,4 @@ __getattr__
     return getattr(self.key, attr)
 AttributeError: rsaKey instance has no attribute 'd'
 
+  [ Gives a more descriptive error now. ]
