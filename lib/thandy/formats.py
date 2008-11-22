@@ -173,7 +173,7 @@ def _encodeCanonical(obj, outf):
     elif obj is True:
         outf("true")
     elif obj is False:
-            outf("false")
+        outf("false")
     elif obj is None:
         outf("null")
     elif isinstance(obj, (int,long)):
@@ -234,7 +234,6 @@ def encodeCanonical(obj, outf=None):
 
     if result is not None:
         return "".join(result)
-
 
 def getDigest(obj, digestObj=None):
     """Update 'digestObj' (typically a SHA256 object) with the digest of

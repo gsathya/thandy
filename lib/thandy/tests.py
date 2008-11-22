@@ -9,6 +9,7 @@ import thandy.keys
 import thandy.formats
 import thandy.repository
 import thandy.checkJson
+import thandy.encodeToXML
 import thandy.util
 
 import thandy.tests
@@ -122,6 +123,7 @@ def suite():
     suite.addTest(doctest.DocTestSuite(thandy.formats))
     suite.addTest(doctest.DocTestSuite(thandy.keys))
     suite.addTest(doctest.DocTestSuite(thandy.checkJson))
+    suite.addTest(doctest.DocTestSuite(thandy.encodeToXML))
 
     loader = unittest.TestLoader()
     suite.addTest(loader.loadTestsFromModule(thandy.tests))

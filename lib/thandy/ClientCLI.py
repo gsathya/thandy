@@ -5,6 +5,10 @@ import logging
 import os
 import sys
 import time
+try:
+    import json
+except ImportError:
+    import simplejson as json
 
 import thandy.formats
 import thandy.util
@@ -13,6 +17,7 @@ import thandy.download
 import thandy.master_keys
 import thandy.packagesys.PackageSystem
 import thandy.socksurls
+import thandy.encodeToXML
 
 def update(args):
     repoRoot = thandy.util.userFilename("cache")
@@ -153,14 +158,20 @@ def update(args):
         logging.info("All downloads finished.")
 
 
-# Tell me what to install.
-
+def json2xml(args):
+    if len(args) != 1:
+        usage()
+    f = open(args[0], 'r')
+    obj = json.load(f)
+    f.close()
+    thandy.encodeToXML.encodeToXML(obj, sys.stdout.write)
 
 def usage():
     print "Known commands:"
     print "  update [--repo=repository] [--no-download] [--loop]"
     print "         [--no-packagesys] [--install] [--socks-port=port]"
     print "         [--debug|--info|--warn] [--force-check]"
+    print "  json2xml file"
     sys.exit(1)
 
 def main():
@@ -169,7 +180,7 @@ def main():
         usage()
     cmd = sys.argv[1]
     args = sys.argv[2:]
-    if cmd in [ "update" ]:
+    if cmd in [ "update", "json2xml" ]:
         globals()[cmd](args)
     else:
         usage()
