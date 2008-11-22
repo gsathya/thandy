@@ -3,8 +3,10 @@
 import getopt
 import logging
 import os
+import re
 import sys
 import time
+import traceback
 try:
     import json
 except ImportError:
@@ -12,6 +14,7 @@ except ImportError:
 
 import thandy.formats
 import thandy.util
+from thandy.util import logCtrl
 import thandy.repository
 import thandy.download
 import thandy.master_keys
@@ -19,13 +22,64 @@ import thandy.packagesys.PackageSystem
 import thandy.socksurls
 import thandy.encodeToXML
 
+class ControlLogFormatter:
+    def _formatStr(self, s):
+        s = '"%s"' % re.sub(r'(["\\])', r'\\\1', s)
+        s = s.replace("\n", "\\n")
+        return s
+
+    def format(self, record):
+        name = record.name
+        if name == 'thandy-ctrl':
+            parts = [ record.msg ]
+            parts.extend(
+                "%s=%s"%(k, self._formatStr(v))
+                for k,v in sorted(getattr(record, 'cmd_args', {}).iteritems()))
+            return " ".join(parts)
+        else:
+            m = record.getMessage()
+            return "%s msg=%s"%(record.levelname, self._formatStr(m))
+
+    def formatException(self, exc_info):
+        return repr(traceback.print_exception())
+
+class RegularLogFilter:
+    def filter(self, record):
+        return record.name != "thandy-ctrl"
+
+def configureLogs(options):
+    logLevel = logging.INFO
+    cLogFormat = False
+    for o,v in options:
+        if o == '--debug':
+            logLevel = logging.DEBUG
+        elif o == '--info':
+            logLevel = logging.INFO
+        elif o == '--warn':
+            logLevel = logging.WARN
+        elif o == '--controller-log-format':
+            cLogFormat = True
+
+    console = logging.StreamHandler()
+    console.setLevel(logLevel)
+    logger = logging.getLogger("")
+    logger.addHandler(console)
+    logger.setLevel(logLevel)
+    if cLogFormat:
+        #formatter = logging.Formatter("%(names)s %(levelname)s %(message)r")
+        formatter = ControlLogFormatter()
+    else:
+        formatter = logging.Formatter("%(levelname)s:%(message)s")
+        console.addFilter(RegularLogFilter())
+    console.setFormatter(formatter)
+
 def update(args):
     repoRoot = thandy.util.userFilename("cache")
-    options, args = getopt.getopt(args, "", [ "repo=", "no-download",
-                                              "loop", "no-packagesys",
-                                              "install", "socks-port=",
-                                              "debug", "info",
-                                              "warn", "force-check"])
+    options, args = getopt.getopt(args, "",
+        [ "repo=", "no-download", "loop", "no-packagesys",
+          "install", "socks-port=", "debug", "info",
+          "warn", "force-check", "controller-log-format"
+          ])
     download = True
     keep_looping = False
     use_packagesys = True
@@ -47,16 +101,10 @@ def update(args):
             install = True
         elif o == "--socks-port":
             socksPort = int(v)
-        elif o == '--debug':
-            logLevel = logging.DEBUG
-        elif o == '--info':
-            logLevel = logging.INFO
-        elif o == '--warn':
-            logLevel = logging.WARN
         elif o == '--force-check':
             forceCheck = True
 
-    logging.basicConfig(level=logLevel)
+    configureLogs(options)
 
     if socksPort:
         thandy.socksurls.setSocksProxy("127.0.0.1", socksPort)
@@ -85,12 +133,17 @@ def update(args):
             forceCheck = False
 
         if installable and not files:
-            logging.info("Ready to install files: %s",
+            for p, d in installable.items():
+                for n in d.keys():
+                    logCtrl("CAN_INSTALL", PKG=p, ITEM=n)
+
+            logging.info("Ready to install packages for files: %s",
                            ", ".join(sorted(installable.keys())))
             if install:
                 # XXXX handle ordering
-                for h in installable.values():
-                    h.install()
+                for p in installable.values():
+                    for h in p.values():
+                        h.install()
             return
 
         elif not files:
@@ -109,6 +162,7 @@ def update(args):
             time.sleep(delay)
             continue
 
+        for f in files: logCtrl("WANTFILE", FILENAME=f)
         logging.info("Files to download are: %s", ", ".join(sorted(files)))
 
         if not download:
@@ -156,7 +210,6 @@ def update(args):
         logging.debug("Waiting for downloads to finish.")
         downloader.wait()
         logging.info("All downloads finished.")
-
 
 def json2xml(args):
     if len(args) != 1:

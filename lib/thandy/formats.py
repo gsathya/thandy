@@ -157,16 +157,16 @@ def checkSignatures(signed, keyDB, role=None, path=None):
 
     return SignatureStatus(goodSigs, badSigs, unknownSigs, tangentialSigs)
 
+def canonical_str_encoder(s):
+    s = '"%s"' % re.sub(r'(["\\])', r'\\\1', s)
+    if isinstance(s, unicode):
+        return s.encode("utf-8")
+    else:
+        return s
+
 def _encodeCanonical(obj, outf):
     # Helper for encodeCanonical.  Older versions of json.encoder don't
     # even let us replace the separators.
-
-    def canonical_str_encoder(s):
-        s = '"%s"' % re.sub(r'(["\\])', r'\\\1', s)
-        if isinstance(s, unicode):
-            return s.encode("utf-8")
-        else:
-            return s
 
     if isinstance(obj, basestring):
         outf(canonical_str_encoder(obj))

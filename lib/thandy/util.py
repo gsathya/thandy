@@ -1,5 +1,6 @@
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
+import logging
 import os
 import sys
 import tempfile
@@ -53,6 +54,7 @@ def userFilename(name):
     except KeyError:
         base = "~/.thandy"
 
+    base = os.path.expanduser(base)
     result = os.path.normpath(os.path.join(base, name))
     ensureParentDir(result)
     return result
@@ -141,3 +143,10 @@ def getRegistryValue(keyname):
     finally:
         if settings is not None:
             settings.Close()
+
+_controlLog = logging.getLogger("thandy-ctrl")
+
+def logCtrl(key, **args):
+    """DOCDOC"""
+    _controlLog.log(logging.INFO, key, extra={'cmd_args':args})
+

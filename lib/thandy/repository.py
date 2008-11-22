@@ -483,6 +483,8 @@ class LocalRepository:
                         if h.isInstalled():
                             alreadyInstalled[h.getRelativePath()] = h
 
+            pkg_rp = pfile.getRelativePath()
+
             for f in package['files']:
                 rp, h = f[:2]
                 if alreadyInstalled.has_key(rp):
@@ -505,7 +507,7 @@ class LocalRepository:
                     need.add(rp)
                 else:
                     if allHandles.has_key(rp):
-                        installableDict[rp] = allHandles[rp]
+                        installableDict.setdefault(pkg_rp, {})[rp] = allHandles[rp]
 
         # Okay; these are the files we need.
         return need
