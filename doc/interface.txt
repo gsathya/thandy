@@ -1,13 +1,12 @@
 
 
-
-
-
-Thandy client interface:
+THANDY CLIENT INTERFACE:
 
    thandy-client update [options] [bundlename...]
 
-Recognized options are:
+   thandy-client json2xml filename
+
+Recognized options for thandy-client update are:
 
    --repo=<dir>    Store downloaded, finished information under <dir>.
                    Defaults to ~/.thandy/cache
@@ -36,10 +35,69 @@ Recognized options are:
                    Download a fresh version of the timestamp file, whether
                    we need it or not.
 
+   --controller-log-format
+                   Output log messages in a format designed to be easy
+                   for controllers to read.  (See below.)
 
-02:55 < nickm> Right now, for a quick-and-dirty thing, vidalia can notice the 
-               specific form of the "Ready to install files:" message.  It can 
-               turn into something more formal later.
-02:56 < nickm> The only 'suggestions' thandy-client understands now are ones 
-               from command-line options, all of which are documented.
-02:56 < armadev> ok
+
+THE CONTROLLER LOG FORMAT:
+
+  All lines are of the form:
+    Keyword SP (Keyword=QuotedString SP)* NL
+
+    Keyword=[A-Za-z0-9_]+
+    QuotedString=DQ Quoted* DQ
+    Quoted =   (Any character except for \, ", or newline)
+             | (\\)
+             | (\")
+             | (\n)
+
+    SP = A single space character.
+    NL = A newline character
+    DQ = A double-quote character.
+
+  Current message types are:
+
+    INFO, WARN, DEBUG
+       These correspond to regular user-visible log messages.
+
+    WANTFILE FILENAME="a relative path in the repository"
+       Thandy wants to download the listed file from some mirror.
+
+    CAN_INSTALL PKG="a relative path in the repository" ITEM="another one"
+       Thandy has enough information to install something.  The 'item' is
+       an installable item (exe, rpm, msi, etc); the PKG is the json package
+       descriptor it belongs to.
+
+THANDY'S JSON2XML FORMAT:
+
+  Some people use libraries whose XML parsers are way better than their JSON
+  parsers, so Thandy includes a quick-and-dirty json2xml converter.  It is a
+  one-way converter that's good enough for Thandy documents, but little else.
+
+  Here's the specification for it.  CONV.x. indicates the conversion of a
+  JSON object x into XML.
+
+     ESC(x) == x, with the characters &, <, and > escaped.
+
+     CONV."x". == ESC(x) if x is a string.
+     CONV.x. == x if x is an integer, a boolean, or none.
+     CONV.[a,b,c,...]. ==
+            <list><item>CONV.a.</item>
+                  <item>CONV.b.</item>
+                  <item>CONV.c.</item>
+            </list>
+
+     CONV.{k1:v1, k2:v2, k3:v3, ...}. ==
+            <dict>CONV.k1:v1.
+                  CONV.k2:v2.
+                  CONV.k3:v3.</dict>
+
+     CONV.k:v. == <k>CONV.v.</k>   if k is a valid XML tag name made up of
+                                   nothing but ascii characters.
+
+               == <dict-entry><key>CONV.k.</key>
+                              <val>CONV.v.</val>
+                  </dict-entry>                     otherwise
+
+

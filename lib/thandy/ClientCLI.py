@@ -224,6 +224,7 @@ def usage():
     print "  update [--repo=repository] [--no-download] [--loop]"
     print "         [--no-packagesys] [--install] [--socks-port=port]"
     print "         [--debug|--info|--warn] [--force-check]"
+    print "         [--controller-log-format]"
     print "  json2xml file"
     sys.exit(1)
 
