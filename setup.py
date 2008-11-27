@@ -3,6 +3,10 @@
 # $Id: setup.py,v 1.103 2007-09-15 19:06:37 nickm Exp $
 
 import sys
+try:
+    import py2exe
+except ImportError:
+    pass
 
 #
 #   Current Thandy version
@@ -127,5 +131,7 @@ setup(name='Thandy',
       packages=['thandy', 'thandy.packagesys'],
       scripts=SCRIPTS,
       cmdclass={'install': InstallCommand},
+      # Tells the py2exe executable what module to actually execute
+      console=['lib/thandy/ClientCLI.py'],
 )
 
