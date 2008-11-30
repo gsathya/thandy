@@ -739,7 +739,10 @@ R.1. Considering recommended versions from Tor consensus directory documents
 
 R.2. Integration with existing GPG signatures
 
-  The OpenPGP signature and key format is so complicated that you'd
-  have to be mad to touch it.
+  The OpenPGP signature and key format is so complicated that you'd have
+  to be mad to try to read it yourself.  (Check out RFC2440 for
+  information about how bad it is in theory; in practice, it's worse.)
+  Therefore, if we wanted to check OpenPGP signatures, we would
+  basically have to bundle GPG.
 
 
