@@ -1,6 +1,9 @@
-- get messaging sorted
+o get messaging sorted
 o try to write up a registry-based exe version checker.,
-- Decouple install from check: they are not necessarily related.
+o Decouple install from check: they are not necessarily related.
+  o Generate newer, better objects internally.
+  - Generate new, better formats for existing 'exe' items
+  - Generate command items properly.
 
 . Download improvements.
   o Back off on download failure.

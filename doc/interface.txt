@@ -69,6 +69,11 @@ THE CONTROLLER LOG FORMAT:
        an installable item (exe, rpm, msi, etc); the PKG is the json package
        descriptor it belongs to.
 
+    NO_INSTALL PKG="a relative path in the repository" ITEM="another one"
+       As CAN_INSTALL, but Thandy has gotten something that it doesn't
+       have a way to install.  Can you help?
+
+
 THANDY'S JSON2XML FORMAT:
 
   Some people use libraries whose XML parsers are way better than their JSON

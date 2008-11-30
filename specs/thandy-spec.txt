@@ -454,14 +454,13 @@
      "version" : VERSION,
      "format" : FMT,
      "ts" : TIME,
-     "files" : [  [ PATH, HASH ], ... ],
+     "files" : [  [ PATH, HASH, INFO ], ... ],
      "shortdesc" : { LANG : DESC, ... },
      "longdesc" : { LANG : DESC, ... },
    }
 
-  Most elements are self-explanatory.  The "FMT" element describes the
-  file format of the package, which should give enough information
-  about how to install it.
+  Most elements are self-explanatory.  To interpret the 'INFO' entry
+  for each installable file, see section 6.
 
   No two package files in the same repository should have the same
   name and version.  If a package needs to be changed, the version
@@ -596,7 +595,115 @@
   keylist.  Note that a new package or bundle key must re-sign and
   issue new versions of all packages or bundles it has generated.
 
+6. Installing files from packages.
 
+  Any single package file in Thandy can refer to one or more installable
+  files in its 'files' list.  These files are called "installable items"
+  below to distinguish them from Thandy's package files as described
+  in 3.7.  Note that these installable items may in turn be called
+  "package files" by other package systems.  Try not to get confused.
+
+6.1. Thandy's demands
+
+  Thandy needs at minimum two things to fully support a kind of
+  installable item.
+
+     - Thandy needs to be able to see whether it has already been
+       installed, _before_ downloading the item.  We call this
+       operation "checking" the item.
+
+     - Thandy needs to be able to install it.  We call this operation
+       "installing" the item, for obscure reasons.
+
+  Methods for checking and installing an item are sometimes linked,
+  but can be orthogonal.  For example, an RPM item is checked and
+  installed with the RPM utility.  An EXE-based installer, on the
+  other hand, might be checked either by looking for a registry entry,
+  by looking to see if a given installed file has a hash as expected,
+  or by looking in Thandy's internal package database.
+
+  To see how to check or install an item, look at the third element of
+  that item's [ PATH, HASH, INFO, ... ] tuple.  We'll call this the
+  item's "INFO" below.
+
+6.2. Checking installable items
+
+  Thandy checks installable items in a package to see whether they're
+  already installed before it tries to download them to the cache.
+  This saves bandwidth.
+
+  To check an item, see whether the check_type field in its INFO is a
+  recognized value.  Recognized values are:
+      "registry"
+      "rpm"
+      "db"
+
+  If the field's value is "registry", the INFO must also have these fields:
+      "registry_ent" : [ KEY, VAL ]
+  The installable item is installed if the win32 registry is present,
+  and it has an entry KEY whose value is VAL.
+
+  If the field's value is "rpm", the INFO must also have these fields:
+      "rpm_version" : VERSION_STRING
+  The installable item is installed if the version listed as installed
+  in the RPM database is exactly VERSION_STRING.
+
+  If the field's value is "db", the INFO must also have these fields:
+      "item_name" : KEY,
+      "item_version" : VAL
+  KEY must be unique across the thandy repository.  It identifies
+  this kind of installable item uniquely.  VAL is the version of this
+  item.  When Thandy installs the item, it writes a persistent mapping
+  from KEY to VAL to a local database.  The item is instaleld if such
+  a mapping is found to exist.
+
+
+  When Thandy decides to update an installable item that has a missing
+  check_type field, or a check_type field with an unrecognized value,
+  Thandy must download the item whether it is installed or not.
+
+6.3. Installing installable items
+
+  To install an item, see whether the install_type field in its INFO is a
+  recognized value.  Recognized values are:
+      "rpm"
+      "command"
+
+  If the field's value is "rpm", the installable item is an RPM
+  package.  It gets installed and removed as normal for an RPM.
+
+  If the field's value is "command", the following field must be
+  present:
+       "cmd_install" : COMMAND
+  The following field is optional:
+       "cmd_remove" : COMMAND
+  Each command is a list of strings executed to install or remove the
+  installable item.  Strings and substrings of the form ${xyz} are
+  special: they trigger variable expansion.  Recognized variables are:
+       ${FILE} : The absolute path to the file to install.
+
+
+  When Thandy decides to install an installable item that has a missing
+  install_type field, or a install_type field with an unrecognized value,
+  Thandy alerts the user to the presence of the file, but can't
+  install it itself.
+
+
+6.99 The obsolete way to install files from packages.
+
+  If an item has no checkType and its package's "format" field is
+  present and set to 'exe', there is an obsolete way to check and
+  install items.  This will no longer be supported once packages of
+  this type are no longer generated, and no longer latest in any
+  bundle.
+
+  If an item in such a package has a registry_ent field in its INFO,
+  its presence is detected in the registry as with
+  check_type=registry_ent.  Otherwise, checking is done with an entry
+  based on the package's name and version in Thandy's internal DB.
+
+  To install such an item, the item itself is executed, with arguments
+  taken from an exe_args list in its INFO.
 
 F. Future directions and open questions
 
