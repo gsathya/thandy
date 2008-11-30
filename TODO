@@ -2,8 +2,17 @@ o get messaging sorted
 o try to write up a registry-based exe version checker.,
 o Decouple install from check: they are not necessarily related.
   o Generate newer, better objects internally.
-  - Generate new, better formats for existing 'exe' items
-  - Generate command items properly.
+  o Generate new, better formats for existing 'exe' items
+  o Generate command items properly.
+
+- Missing packaging features:
+  - Generate multi-item packages properly.
+  - Transition better for checking on a given item
+  - Implement remove
+  - Get RPM actually more tested
+  - Get install-from-compressed-file working.
+  - Transaction support where available.
+  - OSX backend
 
 . Download improvements.
   o Back off on download failure.
@@ -29,8 +38,6 @@ o Write client-side code
   X Rendezvous-back with Tor when done.
 
 - Better configurability: let users override mirrors, keys, etc.
-- Backend for "A bunch of files you can unzip someplace."
-- OSX backend (hard).
 - Proper exponential back-off on download backend.
 
 - Wrapping
@@ -40,7 +47,7 @@ o Write client-side code
   - More comments, more tests
   o Document EXE and RPM formats in HOWTO.
   . full pydoc
-  - revise spec
+  . revise spec
 
 - Testing
   - Much bigger unit tests.

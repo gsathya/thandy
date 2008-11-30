@@ -658,6 +658,7 @@ def makePackageObj(config_fname, package_fname):
     longDescs = {}
     def ShortDesc(lang, val): shortDescs[lang] = val
     def LongDesc(lang, val): longDescs[lang] = val
+    #XXXX handle multiple files.
     preload = { 'ShortDesc' : ShortDesc, 'LongDesc' : LongDesc }
     r = readConfigFile(config_fname,
                        ['name',
@@ -666,7 +667,10 @@ def makePackageObj(config_fname, package_fname):
                         'location',
                         'relpath',
                         ], ['rpm_version', 'exe_args',
-                            'exe_registry_ent' ], preload)
+                            'exe_registry_ent',
+                            'db_key', 'db_val',
+                            'command_install', 'command_remove',
+                            ], preload)
 
     f = open(package_fname, 'rb')
     digest = getFileDigest(f)
@@ -689,21 +693,35 @@ def makePackageObj(config_fname, package_fname):
         if not r.get('rpm_version'):
             raise thandy.FormatException("missing rpm_version value")
         extra['rpm_version'] = r['rpm_version']
+        extra['check_type'] = 'rpm'
+        extra['install_type'] = 'rpm'
     elif format == 'exe':
         if not r.get('exe_args'):
             raise thandy.FormatException("missing exe_args value")
         extra['exe_args'] = r['exe_args']
+        if not r.get('cmd_install'):
+            extra['install_type'] = 'command'
+            extra['cmd_install'] = [ "${FILE}" ] + r['exe_args']
+
+    if r.get('command_install'):
         extra['install_type'] = 'command'
-        extra['cmd_install'] = [ "${FILE}" ] + r['exe_args']
-        if r.get('exe_registry_ent'):
-            if len(r['exe_registry_ent']) != 2:
-                raise thandy.FormatException("Bad length on exe_registry_ent")
-            regkey, regval = r['exe_registry_ent']
-            checkWinRegistryKeyname(regkey)
-            if not isinstance(regval, basestring):
-                raise thandy.FormatException("Bad version on exe_registry_ent")
-            extra['registry_ent'] = [ regkey, regval ]
-            extra['check_type'] = 'registry'
+        extra['cmd_install'] = r['command_install']
+        if r.get('command_remove'):
+            extra['cmd_remove'] = r['command_remove']
+
+    if r.get('exe_registry_ent'):
+        if len(r['exe_registry_ent']) != 2:
+            raise thandy.FormatException("Bad length on exe_registry_ent")
+        regkey, regval = r['exe_registry_ent']
+        checkWinRegistryKeyname(regkey)
+        if not isinstance(regval, basestring):
+            raise thandy.FormatException("Bad version on exe_registry_ent")
+        extra['registry_ent'] = [ regkey, regval ]
+        extra['check_type'] = 'registry'
+    elif r.get('db_key'):
+        extra['item_name'] = r['db_key']
+        extra['item_version'] = r['db_val']
+        extra['check_type'] = 'db'
 
     PACKAGE_SCHEMA.checkMatch(result)
 
