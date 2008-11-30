@@ -110,10 +110,6 @@ def update(args):
         thandy.socksurls.setSocksProxy("127.0.0.1", socksPort)
 
     repo = thandy.repository.LocalRepository(repoRoot)
-    packagesys = None
-    if use_packagesys:
-        packagesys = thandy.packagesys.PackageSystem.PackageMetasystem.create(repo)
-
     downloader = thandy.download.DownloadManager()
     downloader.start()
 
@@ -125,7 +121,7 @@ def update(args):
         installable = {}
         logging.info("Checking for files to update.")
         files = repo.getFilesToUpdate(trackingBundles=args, hashDict=hashes,
-                                      pkgSystems=packagesys,
+                                      usePackageSystem=use_packagesys,
                                       installableDict=installable)
 
         if forceCheck:
@@ -134,8 +130,12 @@ def update(args):
 
         if installable and not files:
             for p, d in installable.items():
-                for n in d.keys():
-                    logCtrl("CAN_INSTALL", PKG=p, ITEM=n)
+                for n, i in d.items():
+                    if i.canInstall():
+                        logCtrl("CAN_INSTALL", PKG=p, ITEM=n)
+                    else:
+                        logCtrl("NO_INSTALL", PKG=p, ITEM=n)
+                    i.setCacheRoot(repoRoot)
 
             logging.info("Ready to install packages for files: %s",
                            ", ".join(sorted(installable.keys())))
@@ -143,7 +143,9 @@ def update(args):
                 # XXXX handle ordering
                 for p in installable.values():
                     for h in p.values():
-                        h.install()
+                        i = h.getInstaller()
+                        if i != None:
+                            i.install()
             return
 
         elif not files:

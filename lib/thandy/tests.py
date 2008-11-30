@@ -11,6 +11,11 @@ import thandy.repository
 import thandy.checkJson
 import thandy.encodeToXML
 import thandy.util
+import thandy.packagesys
+import thandy.packagesys.PackageSystem
+import thandy.packagesys.PackageDB
+import thandy.packagesys.RPMPackages
+import thandy.packagesys.ExePackages
 
 import thandy.tests
 

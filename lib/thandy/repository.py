@@ -2,6 +2,7 @@
 
 import thandy.formats
 import thandy.util
+import thandy.packagesys.PackageSystem
 
 try:
     import json
@@ -297,11 +298,11 @@ class LocalRepository:
         return None
 
     def getFilesToUpdate(self, now=None, trackingBundles=(), hashDict=None,
-                         pkgSystems=None, installableDict=None):
+                         usePackageSystem=True, installableDict=None):
         """Return a set of relative paths for all files that we need
            to fetch.  Assumes that we care about the bundles
            'trackingBundles'.
-           DOCDOC pkgSystems, installableDict, hashDict
+           DOCDOC installableDict, hashDict, usePackageSystem
         """
 
         if now == None:
@@ -313,6 +314,8 @@ class LocalRepository:
 
         if installableDict == None:
             installableDict = {}
+
+        pkgItems = None
 
         need = set()
 
@@ -468,26 +471,31 @@ class LocalRepository:
         for pfile in packages.values():
             package = pfile.get()
 
-            alreadyInstalled = {}
-            allHandles = {}
-            if pkgSystems is not None:
-                psys = pkgSystems.getSysForPackage(package)
-                if psys is None:
-                    logging.info("No way to check whether a %s package is "
-                                 "up-to-date." % package['format'])
-                else:
-                    handles = psys.packageHandlesFromJSON(package)
+            alreadyInstalled = set()
+            pkgItems = {}
 
-                    for h in handles:
-                        allHandles[h.getRelativePath()] = h
-                        if h.isInstalled():
-                            alreadyInstalled[h.getRelativePath()] = h
+            if usePackageSystem:
+                pkgItems = thandy.packagesys.PackageSystem.getItemsFromPackage(
+                    package)
+
+                for f in package['files']:
+                    item = pkgItems[f[0]]
+                    if not item.canCheck():
+                        logging.info("No way to check whether %s is "
+                                     "up-to-date.", f[0])
+                    else:
+                        try:
+                            if item.getChecker().isInstalled():
+                                alreadyInstalled.add(item.getRelativePath())
+                        except thandy.CheckNotSupported, err:
+                            logging.warn("Can't check installed-ness of %s: %s",
+                                         f[0], err)
 
             pkg_rp = pfile.getRelativePath()
 
             for f in package['files']:
                 rp, h = f[:2]
-                if alreadyInstalled.has_key(rp):
+                if rp in alreadyInstalled:
                     logging.info("%s is already installed; no need to download",
                                  rp)
                     continue
@@ -506,8 +514,8 @@ class LocalRepository:
                     logging.info("Hash for %s not as expected; must load.", rp)
                     need.add(rp)
                 else:
-                    if allHandles.has_key(rp):
-                        installableDict.setdefault(pkg_rp, {})[rp] = allHandles[rp]
+                    if pkgItems.has_key(rp):
+                        installableDict.setdefault(pkg_rp, {})[rp] = pkgItems[rp]
 
         # Okay; these are the files we need.
         return need

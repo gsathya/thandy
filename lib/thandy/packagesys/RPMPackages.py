@@ -1,47 +1,17 @@
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
-import thandy.packagesys.PackageSystem
+import thandy.packagesys.PackageSystem as PS
 
 import os
-import rpm
+try:
+    import rpm
+except ImportError:
+    rpm = None
 import md5
 
 import thandy.formats
 
 __all__ = [ 'RPMPackageSystem' ]
-
-class RPMPackageSystem(thandy.packagesys.PackageSystem.PackageSystem):
-    def __init__(self, repo):
-        self._repo = repo
-
-    def getName(self):
-        return "rpm"
-
-    def packageHandlesFromJSON(self, package):
-        if package['format'] != 'rpm':
-            raise thandy.FormatException()
-
-        handles = []
-        for entry in package['files']:
-            if len(entry) < 3:
-                continue
-            fn, h, extra = entry[:3]
-            name = os.path.split(fn)[1]
-
-            try:
-                version = extra['rpm_version']
-            except KeyError:
-                raise thandy.FormatException()
-
-            handles.append(RPMPackageHandle(name,
-                                            version,
-                                            fn,
-                                            self._repo.getFilename(fn)))
-
-        return handles
-
-    def getTransaction(self):
-        return RPMPackageTransaction()
 
 _CALLBACK_CODES = {}
 
@@ -50,33 +20,33 @@ for name in dir(rpm):
         _CALLBACK_CODES[getattr(rpm, name)] = name[12:]
 del name
 
-class RPMPackageTransaction(thandy.packagesys.PackageSystem.PackageTransaction):
+class RPMPackageTransaction:
 
-    def _start(self):
-        thandy.packagesys.PackageSystem.PackageTransaction.__init__(self)
-        self._tset = rpm.TransactionSet()
+   def _start(self):
+       PS.PackageTransaction.__init__(self)
+       self._tset = rpm.TransactionSet()
 
-    def _commit(self):
-        self._tset.run(self._callback, "")
+   def _commit(self):
+       self._tset.run(self._callback, "")
+       
+   def _callback(self, what, amount, total, mydata, _):
+       if what == rpm.RPMCALLBACK_INST_OPEN_FILE:
+           hdr, path = mydata
+           logging.info("Installing RPM for %s [%s]", hdr['name'], path)
 
-    def _callback(self, what, amount, total, mydata, _):
-        if what == rpm.RPMCALLBACK_INST_OPEN_FILE:
-            hdr, path = mydata
-            logging.info("Installing RPM for %s [%s]", hdr['name'], path)
+       elif what == rpm.RPMCALLBACK_INST_CLOSE_FILE:
+           hdr, path = mydata
+           logging.info("Done installing RPM for %s", path)
+           
+       elif what == rpm.RPMCALLBACK_INST_PROGRESS:
+           hdr, path = mydata
+           logging.info("%s: %.5s%% done", name, float(amount)/total*100)
 
-        elif what == rpm.RPMCALLBACK_INST_CLOSE_FILE:
-            hdr, path = mydata
-            logging.info("Done installing RPM for %s", path)
-
-        elif what == rpm.RPMCALLBACK_INST_PROGRESS:
-            hdr, path = mydata
-            logging.info("%s: %.5s%% done", name, float(amount)/total*100)
-
-        else:
-            hdr, path = mydata
-            logging.info("RPM event %s on %s [%s/%s]",
-                         _CALLBACK_CODES.get(what,str(what)),
-                         hdr['name'], amount, total)
+       else:
+           hdr, path = mydata
+           logging.info("RPM event %s on %s [%s/%s]",
+                        _CALLBACK_CODES.get(what,str(what)),
+                        hdr['name'], amount, total)
 
 def addRPMInstall(ts, path):
     fd = os.open(path, os.O_RDONLY)
@@ -155,31 +125,36 @@ def checkRPMInstall(name, version, ts=None):
 
     return found and all_ok
 
-class RPMPackageHandle(thandy.packagesys.PackageSystem.PackageHandle):
-    def __init__(self, name, version, relativePath, filename):
-        self._name = name
-        self._version = version
-        self._relPath = relativePath
-        self._filename = filename
+class RPMChacker(PS.Checker):
+    def __init__(self, rpmname, rpmversion):
+        PS.Checker.__init__(self)
+        self._name = rpmname
+        self._version = rpmversion
 
-    def getRelativePath(self):
-        return self._relPath
+    def __repr__(self):
+        return "RPMChecker(%r, %r)"%(self._name, self._version)
 
-    def anyVersionInstalled(self, transaction=None):
-        return len(getInstalledRPMVersions(self.name, transaction)) > 1
+    def getInstalledVersions(self):
+        return getInstalledRPMVersions(self._name, self._transaction)
 
-    def getInstalledVersion(self, transaction=None):
-        s = max(getInstalledRPMVersions(self._name, transaction))
+    def isInstalled(self):
+        vers = getInstalledRPMVersions(self._name, self._transaction)
+        return self._version in vers
+
+#    def checkInstall(self):
+#        return checkRPMInstall(self._name, self._version)
+
+class RPMInstaller(PS.Installer):
+    def __init__(self, rpmname, relPath):
+        PS.Installer.__init__(self, relPath)
+        self._name = rpmname
+
+    def __repr__(self):
+        return "RPMInstaller(%r, %r)"%(self._name, self._relPath)
 
     def install(self, transaction):
-        addRPMInstall(transaction._trans, self._filename)
+        addRPMInstall(transaction._trans, self.getFilename())
 
     def remove(self, transaction):
         addRPMErase(transaction._trans, self._name)
-
-    def isInstalled(self, transaction=None):
-        return self._version in getInstalledRPMVersions(self._name,transaction)
-
-    def checkInstall(self, transaction=None):
-        return checkRPMInstall(self._name, self._version)
 

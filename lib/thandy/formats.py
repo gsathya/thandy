@@ -443,18 +443,6 @@ BUNDLE_SCHEMA = S.Obj(
                     gloss=S.DictOf(S.AnyStr(), S.AnyStr()),
                     longgloss=S.DictOf(S.AnyStr(), S.AnyStr()))))
 
-PACKAGE_SCHEMA = S.Obj(
-            _type=S.Str("Package"),
-            name=S.AnyStr(),
-            location=RELPATH_SCHEMA,
-            version=VERSION_SCHEMA,
-            format=S.Obj(),
-            ts=TIME_SCHEMA,
-            files=S.ListOf(S.Struct([RELPATH_SCHEMA, HASH_SCHEMA],
-                                    allowMore=True)),
-            shortdesc=S.DictOf(S.AnyStr(), S.AnyStr()),
-            longdesc=S.DictOf(S.AnyStr(), S.AnyStr()))
-
 def checkWinRegistryKeyname(keyname):
     """Check keyname for superficial well-formedness as a win32 registry entry
        name."""
@@ -466,6 +454,59 @@ def checkWinRegistryKeyname(keyname):
         raise thandy.FormatException("Bad hkey on registry entry.")
     elif not key or not value:
         raise thandy.FormatException("Bad registry entry.")
+
+REGISTRY_KEY_SCHEMA = S.Func(checkWinRegistryKeyname)
+
+CHECK_ITEM_SCHEMA = S.TaggedObj(
+    tagName='check_type',
+    tagIsOptional=True,
+    registry=S.Obj(registry_ent=S.Struct([REGISTRY_KEY_SCHEMA, S.AnyStr()])),
+    db=S.Obj(item_name=S.AnyStr(),
+             item_version=S.Any() #XXXX wrong!
+             ),
+    rpm=S.Obj(rpm_version=S.AnyStr()))
+
+INSTALL_ITEM_SCHEMA = S.TaggedObj(
+    tagName='install_type',
+    tagIsOptional=True,
+    command=S.Obj(cmd_install=S.ListOf(S.AnyStr()),
+                  cmd_remove=S.Opt(S.ListOf(S.AnyStr()))),
+    rpm=S.Obj())
+
+OBSOLETE_EXE_FORMAT_ITEM_SCHEMA = S.Obj(
+    registry_ent=S.Opt(S.Struct([REGISTRY_KEY_SCHEMA, S.AnyStr()])),
+    exe_args=S.ListOf(S.AnyStr()))
+OBSOLETE_RPM_FORMAT_ITEM_SCHEMA = S.Obj(
+    rpm_version=S.AnyStr())
+
+ITEM_INFO_SCHEMA = S.AllOf([CHECK_ITEM_SCHEMA, INSTALL_ITEM_SCHEMA])
+
+ITEM_SCHEMA = S.Struct([RELPATH_SCHEMA, HASH_SCHEMA], [ITEM_INFO_SCHEMA],
+                       allowMore=True)
+
+def checkPackageFormatConsistency(obj):
+    format = obj.get('format')
+    if format:
+        formatSchema = { 'exe' : OBSOLETE_EXE_FORMAT_ITEM_SCHEMA,
+                         'rpm' : OBSOLETE_RPM_FORMAT_ITEM_SCHEMA }.get(format)
+        if formatSchema:
+            for f in obj['files']:
+                if len(f) >= 3:
+                    formatSchema.checkMatch(f[2])
+
+PACKAGE_SCHEMA = S.Obj(
+            _type=S.Str("Package"),
+            name=S.AnyStr(),
+            location=RELPATH_SCHEMA,
+            version=VERSION_SCHEMA,
+            format=S.Opt(S.AnyStr()),
+            ts=TIME_SCHEMA,
+            files=S.ListOf(S.Struct([RELPATH_SCHEMA, HASH_SCHEMA],
+                                    allowMore=True)),
+            shortdesc=S.DictOf(S.AnyStr(), S.AnyStr()),
+            longdesc=S.DictOf(S.AnyStr(), S.AnyStr()))
+
+PACKAGE_SCHEMA = S.Func(checkPackageFormatConsistency, PACKAGE_SCHEMA)
 
 ALL_ROLES = ('timestamp', 'mirrors', 'bundle', 'package', 'master')
 
@@ -652,6 +693,8 @@ def makePackageObj(config_fname, package_fname):
         if not r.get('exe_args'):
             raise thandy.FormatException("missing exe_args value")
         extra['exe_args'] = r['exe_args']
+        extra['install_type'] = 'command'
+        extra['cmd_install'] = [ "${FILE}" ] + r['exe_args']
         if r.get('exe_registry_ent'):
             if len(r['exe_registry_ent']) != 2:
                 raise thandy.FormatException("Bad length on exe_registry_ent")
@@ -660,6 +703,7 @@ def makePackageObj(config_fname, package_fname):
             if not isinstance(regval, basestring):
                 raise thandy.FormatException("Bad version on exe_registry_ent")
             extra['registry_ent'] = [ regkey, regval ]
+            extra['check_type'] = 'registry'
 
     PACKAGE_SCHEMA.checkMatch(result)
 
@@ -801,6 +845,7 @@ def makeKeylistObj(keylist_fname, includePrivate=False):
     KEYLIST_SCHEMA.checkMatch(result)
     return result
 
+#XXXX could use taggedobj.  Defer till this has a unit test.
 SCHEMAS_BY_TYPE = {
     'Keylist' : KEYLIST_SCHEMA,
     'Mirrorlist' : MIRRORLIST_SCHEMA,

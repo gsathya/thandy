@@ -2,84 +2,75 @@
 
 import subprocess
 import logging
+import re
+import os
 
 import thandy.util
-import thandy.packagesys.PackageSystem as ps
-import thandy.packagesys.PackageDB as pdb
+import thandy.packagesys.PackageSystem as PS
+import thandy.packagesys.PackageDB as PDB
 
-class ExePackageSystem(pdb.DBBackedPackageSystem):
-    def __init__(self, repo):
-        pdb.DBBackedPackageSystem.__init__(self)
-        self._repo = repo
+class RegistryChecker(PS.Checker):
+    def __init__(self, key, version):
+        PS.Checker.__init__(self)
+        self._key = key
+        self._version = version
 
-    def getName(self):
-        return "exe"
+    def __repr__(self):
+        return "RegistryChecker(%r, %r)"%(self._key, self._version)
 
-    def packageHandlesFromJSON(self, pkg):
-        if pkg['format'] != 'exe':
-            raise thandy.FormatException()
+    def getInstalledVersions(self):
+        try:
+            return [ thandy.util.getRegistryValue(self._key) ]
+        except thandy.util.NoRegistry:
+            raise thandy.CheckNotSupported("This OS has no registry.")
 
-        handles = []
-        for entry in pkg['files']:
-            if len(entry) < 3:
-                continue
-            rp, h, extra = entry[:3]
-            version = pkg['version']
+    def isInstalled(self):
+        return self._version in self.getInstalledVersions()
 
-            handles.append(
-                ExePackageHandle(self.getDB(),
-                                 pkg['name'],
-                                 version,
-                                 [],  # filelist not implemented in this.
-                                 rp,
-                                 self._repo.getFilename(rp),
-                                 arguments=extra.get('exe_args', []),
-                                 registry_ent=extra.get('registry_ent')))
-        return handles
+class CommandInstaller(PS.Installer):
+    def __init__(self, relPath, installCommand, removeCommand=None):
+        PS.Installer.__init__(self, relPath)
+        self._installCommand = installCommand
+        self._removeCommand = removeCommand
 
-    def canBeAutomatic(self):
-        return True
+    def __repr__(self):
+        parts = [ "CommandInstaller(%r, %r" %(self._relPath,
+                                              self._installCommand) ]
+        if self.removeCommand:
+            parts.append(", %r"%self.removeCommand)
+        parts.append(")")
+        return "".join(parts)
 
-    def canHaveUI(self):
-        return True
+    def install(self):
+        self._runCommand(self._installCommand)
 
-class ExePackageHandle(pdb.DBBackedPackageHandle):
-    def __init__(self, packageDB, name, version, filelist, relpath, filename,
-                 arguments, registry_ent=None):
-        pdb.DBBackedPackageHandle.__init__(self, packageDB, name, version, filelist)
-        self._relPath = relpath
-        self._filename = filename
-        self._arguments = arguments
-        self._registry_ent = registry_ent
+    def remove(self):
+        if self._removeCommand:
+            raise thandy.RemoveNotSupported()
+        self._runCommand(self._removeCommand)
 
-    def getRelativePath(self):
-        return self._relPath
+    def _runCommand(self, command):
+        d = { "FILE": self.getFilename() }
+        def replace(m):
+            return d[m.group(1)]
+        try:
+            c = [ re.sub(r'\$\{([\w_]+)\}', replace, word) for word in command ]
+        except KeyError:
+            raise thandy.InstallFailed("Unrecognized option in command %s"
+                                       %command)
+        logging.info("Installing %s.  Command is %s", self._relPath, c)
 
-    def getInstalledVersion(self, transaction=None):
-        if self._registry_ent != None:
-            try:
-                ver = thandy.util.getRegistryValue(self._registry_ent[0])
-                if ver != None:
-                    return ver
-            except thandy.util.NoRegistry:
-                pass
+        return_code = self._execute(c)
+        if return_code != 0:
+            raise thandy.InstallFailed("Return code %s from calling %s"%
+                                       (return_code, c))
 
-        return pdb.DBBackedPackageHandle.getInstalledVersion(self, transaction)
+    def _execute(self, cmd):
+        try:
+            return subprocess.call(cmd)
+        except OSError, e:
+            logging.warn("Error from trying to call %s: %s", cmd, e)
+            raise thandy.InstallFailed("Could not execute install command %s"
+                                       %cmd)
 
-    def isInstalled(self, transaction=None):
-        if self._registry_ent != None:
-            try:
-                ver = thandy.util.getRegistryValue(self._registry_ent[0])
-                return ver == self._registry_ent[1]
-            except thandy.util.NoRegistry:
-                pass
-
-        return pdb.DBBackedPackageHandle.isInstalled(self, transaction)
-
-
-    def _doInstall(self):
-        commandline = [ self._filename ] + self._arguments
-        logging.info("Installing %s.  Command line: %s", self._filename,
-                     commandline)
-        subprocess.call(commandline)
 

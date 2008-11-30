@@ -36,3 +36,14 @@ class UnknownMethod(CryptoError):
 
 class DownloadError(Exception):
     pass
+
+class CheckNotSupported(Exception):
+    pass
+
+class RemoveNotSupported(Exception):
+    pass
+
+class InstallFailed(Exception):
+    pass
+
+

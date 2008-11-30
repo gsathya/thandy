@@ -137,6 +137,16 @@ class OneOf(Schema):
 
         raise thandy.FormatException("Object matched no recognized alternative")
 
+class AllOf(Schema):
+    """Matches the intersection of a list of schemas.
+    """
+    def __init__(self, required):
+        self._subschemas = required[:]
+
+    def checkMatche(self, obj):
+        for s in self._subschemas:
+            s.checkMatch(obj)
+
 class ListOf(Schema):
     """
        Matches a homogenous list of some subschema.
@@ -211,16 +221,34 @@ class Struct(Schema):
        True
        >>> s.matches([["X"]])
        False
+
+       >>> s = Struct([Str("X"), Int()], [Int()])
+       >>> s.matches([])
+       False
+       >>> s.matches({})
+       False
+       >>> s.matches(["X"])
+       False
+       >>> s.matches(["X", 3])
+       True
+       >>> s.matches(["X", 3, 9])
+       True
+       >>> s.matches(["X", 3, 9, 11])
+       False
+       >>> s.matches(["X", 3, "A"])
+       False
     """
-    def __init__(self, subschemas, allowMore=False, structName="list"):
-        self._subschemas = subschemas[:]
+    def __init__(self, subschemas, optschemas=[], allowMore=False,
+                 structName="list"):
+        self._subschemas = subschemas + optschemas
+        self._min = len(subschemas)
         self._allowMore = allowMore
         self._structName = structName
     def checkMatch(self, obj):
         if not isinstance(obj, (list, tuple)):
             raise thandy.FormatException("Expected %s; got %r"
                                          %(self._structName,obj))
-        elif len(obj) < len(self._subschemas):
+        elif len(obj) < self._min:
             raise thandy.FormatException(
                 "Too few fields in %s"%self._structName)
         elif len(obj) > len(self._subschemas) and not self._allowMore:
@@ -298,6 +326,10 @@ class Obj(Schema):
 
 
     def checkMatch(self, obj):
+        if not isinstance(obj, dict):
+            raise thandy.FormatException("Wanted a %s; did not get a dict"%
+                                         self._objname)
+
         for k,schema in self._required:
             try:
                 item = obj[k]
@@ -313,6 +345,63 @@ class Obj(Schema):
                     raise thandy.FormatException("%s in %s.%s"
                                                  %(e,self._objname,k))
 
+class TaggedObj(Schema):
+    """
+       Matches an object based on the value of a particular 'tag' field.
+       If tagIsOptional, matches any object when the tag is missing.
+       If ignoreUnrecognized, matches any object when the tag is present
+       but the value is not one we know.
+
+       >>> s = TaggedObj('tp', a=Obj(int1=Int()), b=Obj(s=AnyStr()))
+       >>> s.matches(3)
+       False
+       >>> s.matches([])
+       False
+       >>> s.matches({})
+       False
+       >>> s.matches({'tp' : 'fred'})
+       True
+       >>> s.matches({'tp' : 'a'})
+       False
+       >>> s.matches({'tp' : 'a', 'int1': 3})
+       True
+       >>> s.matches({'tp' : 'a', 'int1': []})
+       False
+       >>> s.matches({'tp' : 'b', 'int1': 3, 's': 'tt'})
+       True
+    """
+    def __init__(self, tagName, tagIsOptional=False, ignoreUnrecognized=True,
+                 **tagvals):
+        self._tagName = tagName
+        self._tagOpt = tagIsOptional
+        self._ignoreOthers = ignoreUnrecognized
+        self._tagvals = tagvals
+
+    def checkMatch(self, obj):
+        try:
+            tag = obj[self._tagName]
+        except KeyError:
+            if self._tagOpt:
+                return
+            else:
+                raise thandy.FormatException("Missing tag %s on object"%
+                                             self._tagName)
+        except TypeError:
+            raise thandy.FormatException("Got a %s, not a tagged object"%
+                                         type(obj))
+        if not isinstance(tag, basestring):
+            raise thandy.FormatException("Expected a string for %s; got a %s"%(
+                    self._tagName, type(tag)))
+        try:
+            subschema = self._tagvals[tag]
+        except KeyError:
+            if self._ignoreOthers:
+                return
+            else:
+                raise thandy.FormatException("Unrecognized value %s for %s"%(
+                        tag, self._tagName))
+
+        subschema.checkMatch(obj)
 
 class Int(Schema):
     """
@@ -359,3 +448,14 @@ class Bool(Schema):
     def checkMatch(self, obj):
         if not isinstance(obj, bool):
             raise thandy.FormatException("Got %r instead of a boolean"%obj)
+
+class Func(Schema):
+    def __init__(self, fn, baseSchema=None):
+        self._fn = fn
+        self._base = baseSchema
+    def checkMatch(self, obj):
+        if self._base:
+            self._base.checkMatch(obj)
+        r = self._fn(obj)
+        if r is False:
+            raise thandy.FormatException("%s returned False"%self._fn)
