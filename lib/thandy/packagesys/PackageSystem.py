@@ -81,7 +81,7 @@ def getInstaller(installType, relPath, extra, defaultFormat, package):
     elif installType == 'command':
         import thandy.packagesys.ExePackages
         installer = thandy.packagesys.ExePackages.CommandInstaller(
-            relPath, extra['cmd_install'], extra.get['cmd_remove'])
+            relPath, extra['cmd_install'], extra['cmd_remove'])
     else:
         return None
 
