@@ -7,11 +7,6 @@ import tempfile
 import random
 
 try:
-    import json
-except ImportError:
-    import simplejson as json
-
-try:
     import _winreg
 except ImportError:
     _winreg = None
@@ -19,6 +14,50 @@ except ImportError:
 import thandy.formats
 import thandy.keys
 import thandy.master_keys
+
+_jsonModule = None
+
+def importJSON():
+    global _jsonModule
+    if _jsonModule is not None:
+        return _jsonModule
+
+    for name in [ "json", "simplejson" ]:
+        try:
+            mod = __import__(name)
+        except ImportError:
+            continue
+        if not hasattr(mod, "dumps"):
+            # Some versions of Ubuntu have a module called 'json' that is
+            # not a recognizable simplejson module.  Naughty.
+            if name == 'json':
+                logging.warn("Your operating system has a nonfunctional json "
+                             "module.  That's going to break any programs that "
+                             "use the real json module in Python 2.6.  Trying "
+                             "simplejson instead.")
+            continue
+
+        # Some old versions of simplejson escape / as \/ in a misguided and
+        # inadequate attempt to fix XSS attacks.  Make them not do that.  This
+        # code is not guaranteed to work on all broken versions of simplejson:
+        # it replaces an entry in the internal character-replacement
+        # dictionary so that "/" is translated to itself rather than to \/.
+        try:
+            escape_dct = mod.encoder.ESCAPE_DCT
+        except NameError:
+            pass
+        else:
+            if escape_dct.has_key("/"):
+                escape_dct["/"] = "/"
+                logging.warn("Your operating system has an old broken "
+                             "simplejson module.  I tried to fix it for you.")
+
+        _jsonModule = mod
+        return mod
+
+    raise ImportError("Couldn't import a working json module")
+
+json = importJSON()
 
 def moveFile(fromLocation, toLocation):
     """Move the file from fromLocation to toLocation, removing any file

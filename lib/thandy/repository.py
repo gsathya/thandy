@@ -4,10 +4,7 @@ import thandy.formats
 import thandy.util
 import thandy.packagesys.PackageSystem
 
-try:
-    import json
-except ImportError:
-    import simplejson as json
+json = thandy.util.importJSON()
 
 import logging
 import os

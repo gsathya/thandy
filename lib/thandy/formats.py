@@ -1,16 +1,14 @@
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
-try:
-    import json
-except ImportError:
-    import simplejson as json
-
 import time
 import re
 import binascii
 import calendar
 
 import thandy.checkJson
+import thandy.util
+
+json = thandy.util.importJSON()
 
 import Crypto.Hash.SHA256
 

@@ -7,10 +7,6 @@ import re
 import sys
 import time
 import traceback
-try:
-    import json
-except ImportError:
-    import simplejson as json
 
 import thandy.formats
 import thandy.util
@@ -21,6 +17,8 @@ import thandy.master_keys
 import thandy.packagesys.PackageSystem
 import thandy.socksurls
 import thandy.encodeToXML
+
+json = thandy.util.importJSON()
 
 class ControlLogFormatter:
     def _formatStr(self, s):

@@ -5,14 +5,11 @@ import sys
 import getopt
 import time
 
-try:
-    import json
-except:
-    import simplejson as json
-
 import thandy.formats
 import thandy.util
 import thandy.keys
+
+json = thandy.util.importJSON()
 
 def tstamp():
     return time.strftime("%Y%m%d_%H%M%S", time.localtime())

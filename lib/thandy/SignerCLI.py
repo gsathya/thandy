@@ -4,13 +4,12 @@ import os
 import getopt
 import sys
 import logging
-try:
-    import json
-except ImportError:
-    import simplejson as json
 
 import thandy.keys
 import thandy.formats
+import thandy.util
+
+json = thandy.util.importJSON()
 
 def getKeyStore():
     return thandy.keys.KeyStore(thandy.util.userFilename("secret_keys"))

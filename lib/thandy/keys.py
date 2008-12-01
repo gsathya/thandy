@@ -13,13 +13,10 @@ import struct
 import sys
 import getpass
 
-try:
-    import json
-except ImportError:
-    import simplejson as json
-
 import thandy.formats
 import thandy.util
+
+json = thandy.util.importJSON()
 
 class PublicKey:
     """Abstract base class for public keys."""
