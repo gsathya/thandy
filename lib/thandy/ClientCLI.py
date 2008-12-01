@@ -8,6 +8,7 @@ import sys
 import time
 import traceback
 
+import thandy.keys
 import thandy.formats
 import thandy.util
 from thandy.util import logCtrl

@@ -5,9 +5,9 @@ import sys
 import getopt
 import time
 
+import thandy.keys
 import thandy.formats
 import thandy.util
-import thandy.keys
 
 json = thandy.util.importJSON()
 
