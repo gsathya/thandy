@@ -11,9 +11,9 @@ except ImportError:
 #
 #   Current Thandy version
 #
-VERSION = '0.0.1-alpha'
-# System: 0==alpha, 50==beta, 98=pre, 99==release candidate, 100==release
-VERSION_INFO = (0,0,1)
+VERSION = '0.0.2-alpha'
+
+VERSION_INFO = (0,0,2)
 
 try:
     import Crypto
@@ -119,6 +119,11 @@ class InstallCommand(distutils.command.install.install):
 
         distutils.command.install.install.run(self)
 
+extra_args = { }
+if 'py2exe' in sys.argv:
+    # Tells the py2exe executable what module to actually execute.
+    extra_args["console"] = 'lib/thandy/ClientCLI.py'
+
 setup(name='Thandy',
       version=VERSION,
       license="3-clause BSD",
@@ -131,7 +136,6 @@ setup(name='Thandy',
       packages=['thandy', 'thandy.packagesys'],
       scripts=SCRIPTS,
       cmdclass={'install': InstallCommand},
-      # Tells the py2exe executable what module to actually execute
-      console=['lib/thandy/ClientCLI.py'],
+      **extra_args
 )
 
