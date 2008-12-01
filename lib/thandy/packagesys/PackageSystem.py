@@ -141,48 +141,81 @@ class PackageItem:
         return self._installer
 
 class Checker:
-    """
+    """Abstract base class.  A Checker knows how to detect whether a given
+       installable item is installed, and how to tell what version is installed.
+
+       All version checking functions may raise CheckNotSupported if they need
+       an OS-dependent package detection mechanism that we don't have.
+       Examples include checking the Windows Registry on a non-win32 platform.
     """
     def __init__(self):
         self._transaction = None
 
     def setTransaction(self, transaction):
+        """Associate this Checker with a given transaction.  Future actions
+           will take place in the given transaction context, if this Checker
+           supports transactions.
+        """
         self._transaction = transaction
 
 #    def checkInstall(self):
 #        raise NotImplemented()
 
     def anyVersionInstalled(self):
+        """Return true iff any version of this item is installed."""
         raise len(self.getInstalledVersions()) > 1
 
     def getInstalledVersions(self):
+        """Return a list of all versions of this item that are
+           installed.  Version types are item-dependent: a tuple or a
+           string is most common.
+        """
         raise NotImplemented
 
     def isInstalled(self):
+        """Return true iff this particular version of this item is installed.
+        """
         raise NotImplemented
 
 class Installer:
+    """Abstract base class.  An Installer knows how to install or remove an
+       installable item.
+    """
     def __init__(self, relativePath):
         self._transaction = None
         self._cacheRoot = None
         self._relPath = relativePath
 
     def setTransaction(self, transaction):
+        """Associate this Installer with a given transaction.  Future actions
+           will take place in the given transaction context, if this Checker
+           supports transactions.
+        """
         self._transaction = transaction
 
     def setCacheRoot(self, cacheRoot):
+        """Associate this Installer with a given cache root directory.  It
+           looks for downloaded files under this directory.
+        """
         self._cacheRoot = cacheRoot
 
     def getFilename(self):
+        """Return the absolute pathname for this installable item as cached
+           on disk.
+        """
         rp = self._relPath
         if rp.startswith('/'):
             rp = rp[1:]
         return os.path.normpath(os.path.join(self._cacheRoot, rp))
 
-    def install(self, relativePath, root):
+    def install(self):
+        """Install the item from the cache.  May raise InstallFailed if we
+           the installation failed.
+        """
         raise NotImplemented()
 
     def remove(self):
+        """Remove the installed item.  May raise RemoveNotSupported"""
         raise NotImplemented()
 
     def getInstallResult(self):
