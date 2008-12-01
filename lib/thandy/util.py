@@ -42,6 +42,9 @@ def importJSON():
         # code is not guaranteed to work on all broken versions of simplejson:
         # it replaces an entry in the internal character-replacement
         # dictionary so that "/" is translated to itself rather than to \/.
+        # We also need to make sure that ensure_ascii is False, so that we
+        # do not call the C-optimized string encoder in these broken versions,
+        # which we can't fix easily.  Both parts are a kludge.
         try:
             escape_dct = mod.encoder.ESCAPE_DCT
         except NameError:
@@ -49,6 +52,16 @@ def importJSON():
         else:
             if escape_dct.has_key("/"):
                 escape_dct["/"] = "/"
+                save_dumps = simplejson.dumps
+                save_dump = simplejson.dump
+                def dumps(*k, **v):
+                    v['ensure_ascii']=False
+                    return save_dumps(*k,**v)
+                def dump(*k,**v):
+                    v['ensure_ascii']=False
+                    return save_dump(*k,**v)
+                simplejson.dump = dump
+                simplejson.dumps = dumps
                 logging.warn("Your operating system has an old broken "
                              "simplejson module.  I tried to fix it for you.")
 
