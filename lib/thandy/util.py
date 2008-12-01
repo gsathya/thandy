@@ -52,16 +52,16 @@ def importJSON():
         else:
             if escape_dct.has_key("/"):
                 escape_dct["/"] = "/"
-                save_dumps = simplejson.dumps
-                save_dump = simplejson.dump
+                save_dumps = mod.dumps
+                save_dump = mod.dump
                 def dumps(*k, **v):
                     v['ensure_ascii']=False
                     return save_dumps(*k,**v)
                 def dump(*k,**v):
                     v['ensure_ascii']=False
                     return save_dump(*k,**v)
-                simplejson.dump = dump
-                simplejson.dumps = dumps
+                mod.dump = dump
+                mod.dumps = dumps
                 logging.warn("Your operating system has an old broken "
                              "simplejson module.  I tried to fix it for you.")
 
