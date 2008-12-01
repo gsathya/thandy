@@ -122,7 +122,7 @@ class InstallCommand(distutils.command.install.install):
 extra_args = { }
 if 'py2exe' in sys.argv:
     # Tells the py2exe executable what module to actually execute.
-    extra_args["console"] = 'lib/thandy/ClientCLI.py'
+    extra_args["console"] = ['lib/thandy/ClientCLI.py']
 
 setup(name='Thandy',
       version=VERSION,
