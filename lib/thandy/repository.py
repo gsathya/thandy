@@ -321,7 +321,6 @@ class LocalRepository:
             try:
                 f.load()
             except OSError, e:
-                print "need", f.getPath()
                 logging.info("Couldn't load %s: %s.  Must fetch it.",
                              f.getPath(), e)
                 need.add(f.getRelativePath())

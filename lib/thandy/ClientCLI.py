@@ -22,22 +22,14 @@ import thandy.encodeToXML
 json = thandy.util.importJSON()
 
 class ControlLogFormatter:
-    def _formatStr(self, s):
-        s = '"%s"' % re.sub(r'(["\\])', r'\\\1', s)
-        s = s.replace("\n", "\\n")
-        return s
-
     def format(self, record):
         name = record.name
         if name == 'thandy-ctrl':
-            parts = [ record.msg ]
-            parts.extend(
-                "%s=%s"%(k, self._formatStr(v))
-                for k,v in sorted(getattr(record, 'cmd_args', {}).iteritems()))
-            return " ".join(parts)
+            return record.getMessage()
         else:
             m = record.getMessage()
-            return "%s msg=%s"%(record.levelname, self._formatStr(m))
+            return "%s msg=%s"%(record.levelname,
+                                thandy.util.formatLogString(m))
 
     def formatException(self, exc_info):
         return repr(traceback.print_exception())

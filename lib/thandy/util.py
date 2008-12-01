@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 import sys
 import tempfile
 import random
@@ -198,7 +199,15 @@ def getRegistryValue(keyname):
 
 _controlLog = logging.getLogger("thandy-ctrl")
 
+def formatLogString(s):
+    s = '"%s"' % re.sub(r'(["\\])', r'\\\1', s)
+    s = s.replace("\n", "\\n")
+    return s
+
 def logCtrl(key, **args):
     """DOCDOC"""
-    _controlLog.log(logging.INFO, key, extra={'cmd_args':args})
+    parts = [ key ]
+    parts.extend(
+        "%s=%s"%(k, formatLogString(v)) for k,v in sorted(args.iteritems()))
+    _controlLog.log(logging.INFO, " ".join(parts))
 
