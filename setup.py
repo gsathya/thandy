@@ -123,6 +123,17 @@ extra_args = { }
 if 'py2exe' in sys.argv:
     # Tells the py2exe executable what module to actually execute.
     extra_args["console"] = ['lib/thandy/ClientCLI.py']
+    # The following options tell py2exe to create a single exeutable file instead
+    # of a directory of dependencies or exe and zip library.
+    # Some additional modules are specified explicitly because the way they are
+    # loaded prevents py2exe from tracing the dependencies automagically.
+    extra_args["zipfile"] = None
+    extra_args["options"] = {
+                            'py2exe': {
+                                      'bundle_files': 1,
+                                      'includes': ["linecache", "getopt", "json"]
+                            }
+    }
 
 setup(name='Thandy',
       version=VERSION,
