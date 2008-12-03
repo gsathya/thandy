@@ -117,6 +117,10 @@ class PackageItem:
         self._checker = checker
         self._installer = installer
 
+    def getRelativePath(self):
+        """DOCDOC"""
+        return self._relPath
+
     def setTransaction(self, transaction):
         """Set the transaction context for this item to 'transaction'.
         """
