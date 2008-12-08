@@ -55,6 +55,13 @@ class CryptoTests(unittest.TestCase):
         self.assertRaises(thandy.UnknownFormat, thandy.keys.decryptSecret,
                           "foobar", password)
 
+        s2 = u"The secret word is now unicode frobbish."
+        encrypted = thandy.keys.encryptSecret(s2, password)
+        self.assertNotEquals(encrypted, s2.encode("utf-8"))
+        self.assert_(encrypted.startswith("GKEY1"))
+        self.assertEquals(s2, thandy.keys.decryptSecret(encrypted, password))
+
+
     def test_keystore(self):
         passwd = "umfitty noonah"
         fname = tempfile.mktemp()

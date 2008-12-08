@@ -279,9 +279,14 @@ def encryptSecret(secret, password, difficulty=0x80):
     #       D      -- 32 bytes; SHA256 hash of (salt|secret|salt).
     #
     # This format leaks the secret length, obviously.
+    #
+    # If the secret started out in unicode, we encode it using UTF-8
+    # and prepend the string "utf-8:" before we begin encryption.
     assert 0 <= difficulty < 256
     salt = os.urandom(SALTLEN)+chr(difficulty)
     key = secretToKey(salt, password)
+    if isinstance(secret, unicode):
+        secret = "utf-8:"+secret.encode("utf-8")
 
     d_obj = Crypto.Hash.SHA256.new()
     d_obj.update(salt)
@@ -339,6 +344,9 @@ def decryptSecret(encrypted, password):
 
     if d.digest() != hash:
         raise thandy.BadPassword()
+
+    if secret.startswith("utf-8:"):
+        secret = secret[6:].decode("utf-8")
 
     return secret
 
