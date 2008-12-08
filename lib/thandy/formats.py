@@ -796,7 +796,7 @@ def makeTimestampObj(mirrorlist_obj, keylist_obj,
         k = getBundleKey(bundle['location'])
         v = bundle['version']
         entry = [ v, bundle['location'], bundle['at'], formatHash(getDigest(bundle)) ]
-        if not bundles.has_key(k) or versionIsNewer(v, bundles[k]['version']):
+        if not bundles.has_key(k) or versionIsNewer(v, bundles[k][0]):
             bundles[k] = entry
 
     TIMESTAMP_SCHEMA.checkMatch(result)
