@@ -14,6 +14,8 @@ o Decouple install from check: they are not necessarily related.
   remove the installer. unless we want to keep it around for repairs
   or something. even then, after a succesful install, it might as well
   automatically remove all packages older than the one it just installed.
+  <coderman> edmanm: you can repair without a copy of the package
+  laying around. no need to keep them.
 
 - Security stuff that we should do
   1 Check SSL certs or something in urllib2.  Not that Thandy really cares
