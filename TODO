@@ -7,6 +7,14 @@ o Decouple install from check: they are not necessarily related.
 
 - Better version comparison.
 
+- <arma> should thandy auto-clean its cache? should there be a new 'thandy
+  clean' way to call it? should it be a command-line option, on by
+  default? the last one seems best.
+  <edmanm> after a successful install, i would think thandy could just
+  remove the installer. unless we want to keep it around for repairs
+  or something. even then, after a succesful install, it might as well
+  automatically remove all packages older than the one it just installed.
+
 - Security stuff that we should do
   1 Check SSL certs or something in urllib2.  Not that Thandy really cares
     about repositories getting mitm'd.
