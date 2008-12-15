@@ -33,6 +33,9 @@ class RepositoryFile:
         self._signedFormat = signedFormat
         self._needSigs = needSigs
 
+        # The length of the file as stored on disk.
+        self._length = None
+
         # The contents of the file, parsed.  None if we haven't loaded
         # the file.
         self._main_obj = None
@@ -70,6 +73,7 @@ class RepositoryFile:
         f = None
         fd = os.open(fname, os.O_RDONLY)
         try:
+            self._length = os.fstat(fd).st_size
             f = os.fdopen(fd, 'r')
         except:
             os.close(fd)
@@ -295,7 +299,8 @@ class LocalRepository:
         return None
 
     def getFilesToUpdate(self, now=None, trackingBundles=(), hashDict=None,
-                         usePackageSystem=True, installableDict=None):
+                         lengthDict=None, usePackageSystem=True,
+                         installableDict=None):
         """Return a set of relative paths for all files that we need
            to fetch.  Assumes that we care about the bundles
            'trackingBundles'.
@@ -311,6 +316,9 @@ class LocalRepository:
 
         if installableDict == None:
             installableDict = {}
+
+        if lengthDict == None:
+            lengthDict = {}
 
         pkgItems = None
 
@@ -370,6 +378,10 @@ class LocalRepository:
             ts.getKeylistInfo().getHash()
         hashDict[self._mirrorlistFile.getRelativePath()] = \
             ts.getMirrorlistInfo().getHash()
+        lengthDict[self._keylistFile.getRelativePath()] = \
+            ts.getKeylistInfo().getLength()
+        lengthDict[self._mirrorlistFile.getRelativePath()] = \
+            ts.getMirrorlistInfo().getLength()
 
         h_kf = thandy.formats.getDigest(self._keylistFile.get())
         h_expected = ts.getKeylistInfo().getHash()
@@ -407,6 +419,7 @@ class LocalRepository:
             rp = binfo.getRelativePath()
             h_expected = binfo.getHash()
             hashDict[rp] = h_expected
+            lengthDict[rp] = binfo.getLength()
             bfile = self.getBundleFile(rp)
             try:
                 bfile.load()
@@ -440,6 +453,7 @@ class LocalRepository:
                 pfile = self.getPackageFile(rp)
                 h_expected = thandy.formats.parseHash(pkginfo['hash'])
                 hashDict[rp] = h_expected
+                lengthDict[rp] = pkginfo.get('length')
                 try:
                     pfile.load()
                 except OSError:
@@ -498,6 +512,8 @@ class LocalRepository:
 
                 h_expected = thandy.formats.parseHash(h)
                 hashDict[rp] = h_expected
+                if len(f) > 3:
+                    lengthDict[rp] = h[3]
                 fn = self.getFilename(rp)
                 try:
                     h_got = thandy.formats.getFileDigest(fn)

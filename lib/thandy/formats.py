@@ -375,6 +375,7 @@ SIG_METHOD_SCHEMA = S.AnyStr()
 RELPATH_SCHEMA = PATH_PATTERN_SCHEMA = S.AnyStr()
 URL_SCHEMA = S.AnyStr()
 VERSION_SCHEMA = S.ListOf(S.Any()) #XXXX WRONG
+LENGTH_SCHEMA = S.Int(lo=0)
 
 # A single signature of an object.  Indicates the signature, the id of the
 # signing key, and the signing method.
@@ -392,7 +393,7 @@ ROLENAME_SCHEMA = S.AnyStr()
 
 # A role: indicates that a key is allowed to certify a kind of
 # document at a certain place in the repo.
-ROLE_SCHEMA = S.Struct([ROLENAME_SCHEMA, PATH_PATTERN_SCHEMA])
+ROLE_SCHEMA = S.Struct([ROLENAME_SCHEMA, PATH_PATTERN_SCHEMA], allowMore=True)
 
 # A Keylist: indicates a list of live keys and their roles.
 KEYLIST_SCHEMA = S.Obj(
@@ -415,12 +416,12 @@ MIRRORLIST_SCHEMA = S.Obj(
 TIMESTAMP_SCHEMA = S.Obj(
     _type = S.Str("Timestamp"),
     at = TIME_SCHEMA,
-    m = S.Struct([TIME_SCHEMA, HASH_SCHEMA]),
-    k = S.Struct([TIME_SCHEMA, HASH_SCHEMA]),
+    m = S.Struct([TIME_SCHEMA, HASH_SCHEMA], [LENGTH_SCHEMA], allowMore=True),
+    k = S.Struct([TIME_SCHEMA, HASH_SCHEMA], [LENGTH_SCHEMA], allowMore=True),
     b = S.DictOf(keySchema=S.AnyStr(),
             valSchema=
-                 S.Struct([ VERSION_SCHEMA, RELPATH_SCHEMA, TIME_SCHEMA, HASH_SCHEMA ]))
-   )
+                 S.Struct([ VERSION_SCHEMA, RELPATH_SCHEMA, TIME_SCHEMA, HASH_SCHEMA ], [LENGTH_SCHEMA], allowMore=True))
+    )
 
 # A Bundle: lists a bunch of packages that should be updated in tandem
 BUNDLE_SCHEMA = S.Obj(
@@ -436,6 +437,7 @@ BUNDLE_SCHEMA = S.Obj(
                     version=VERSION_SCHEMA,
                     path=RELPATH_SCHEMA,
                     hash=HASH_SCHEMA,
+                    length=S.Opt(LENGTH_SCHEMA),
                     order=S.Struct([S.Int(), S.Int(), S.Int()]),
                     optional=S.Opt(S.Bool()),
                     gloss=S.DictOf(S.AnyStr(), S.AnyStr()),
@@ -479,7 +481,8 @@ OBSOLETE_RPM_FORMAT_ITEM_SCHEMA = S.Obj(
 
 ITEM_INFO_SCHEMA = S.AllOf([CHECK_ITEM_SCHEMA, INSTALL_ITEM_SCHEMA])
 
-ITEM_SCHEMA = S.Struct([RELPATH_SCHEMA, HASH_SCHEMA], [ITEM_INFO_SCHEMA],
+ITEM_SCHEMA = S.Struct([RELPATH_SCHEMA, HASH_SCHEMA],
+                       [ITEM_INFO_SCHEMA, LENGTH_SCHEMA],
                        allowMore=True)
 
 def checkPackageFormatConsistency(obj):
@@ -578,23 +581,27 @@ class Keylist(KeyDB):
             self.addKey(key)
 
 class StampedInfo:
-    def __init__(self, ts, hash, version=None, relpath=None):
+    def __init__(self, ts, hash, version=None, relpath=None, length=None):
         self._ts = ts
         self._hash = hash
         self._version = version
         self._relpath = relpath
+        self._length = length
 
     @staticmethod
-    def fromJSonFields(timeStr, hashStr):
+    def fromJSonFields(timeStr, hashStr, length=None):
         t = parseTime(timeStr)
         h = parseHash(hashStr)
-        return StampedInfo(t, h)
+        return StampedInfo(t, h, length=length)
 
     def getHash(self):
         return self._hash
 
     def getRelativePath(self):
         return self._relpath
+
+    def getLength(self):
+        return self._length
 
 class TimestampFile:
     def __init__(self, at, mirrorlistinfo, keylistinfo, bundleinfo):
@@ -607,15 +614,18 @@ class TimestampFile:
     def fromJSon(obj):
         # must be validated.
         at = parseTime(obj['at'])
-        m = StampedInfo.fromJSonFields(*obj['m'][:2])
-        k = StampedInfo.fromJSonFields(*obj['k'][:2])
+        m = StampedInfo.fromJSonFields(*obj['m'][:3])
+        k = StampedInfo.fromJSonFields(*obj['k'][:3])
         b = {}
         for name, bundle in obj['b'].iteritems():
             v = bundle[0]
             rp = bundle[1]
             t = parseTime(bundle[2])
             h = parseHash(bundle[3])
-            b[name] = StampedInfo(t, h, v, rp)
+            ln = None
+            if len(bundle) > 4:
+                ln = bundle[4]
+            b[name] = StampedInfo(t, h, v, rp, ln)
 
         return TimestampFile(at, m, k, b)
 
@@ -672,6 +682,8 @@ def makePackageObj(config_fname, package_fname):
 
     f = open(package_fname, 'rb')
     digest = getFileDigest(f)
+    f.close()
+    f_len = os.stat(package_fname).st_size
 
     # Check fields!
     extra = {}
@@ -681,7 +693,7 @@ def makePackageObj(config_fname, package_fname):
                'location' : r['location'], #DOCDOC
                'version' : r['version'],
                'format' : r['format'],
-               'files' : [ [ r['relpath'], formatHash(digest), extra ] ],
+               'files' : [ [ r['relpath'], formatHash(digest), extra, f_len ] ],
                'shortdesc' : shortDescs,
                'longdesc' : longDescs
              }
@@ -725,7 +737,7 @@ def makePackageObj(config_fname, package_fname):
 
     return result
 
-def makeBundleObj(config_fname, getPackage):
+def makeBundleObj(config_fname, getPackage, getPackageLength):
     packages = []
     def ShortGloss(lang, val): packages[-1]['gloss'][lang] = val
     def LongGloss(lang, val): packages[-1]['longgloss'][lang] = val
@@ -763,6 +775,9 @@ def makeBundleObj(config_fname, getPackage):
             raise thandy.FormatException("No such package as %s"%p['name'])
 
         p['hash'] = formatHash(getDigest(pkginfo))
+        length = getPackageLength(p['name'])
+        if length != None:
+            p['length'] = length
         if p['path'] == None:
             p['path'] = pkginfo['location']
         if p['version'] == None:

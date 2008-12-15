@@ -397,10 +397,10 @@
 
     { "_type" : Timestamp,
       "at" : TIME,
-      "m" : [ TIME, HASH ],
-      "k" : [ TIME, HASH ],
+      "m" : [ TIME, HASH, LENGTH ],
+      "k" : [ TIME, HASH, LENGTH ],
       "b" : { NAME :
-                 [ [ Version, Path, Time, Hash ] ] }
+                 [ [ Version, Path, Time, Hash, (Length) ] ] }
     }
 
   TIME is when the timestamp was signed.  MIRRORLISTHASH is the digest
@@ -408,6 +408,8 @@
   file; and the 'b' entries are a list of the latest version of all
   bundles and their locations and hashes.  The "name" of a bundle (in
   this context) is the directory component of the bundle's path.
+
+  The LENGTH field may be absent on very old timestamp files.
 
 3.6. File formats: bundle files
 
@@ -423,6 +425,7 @@
               "version" : VERSION,
               "path" : PATH,
               "hash" : HASH,
+              ("length" : LENGTH),
               "order" : [ INST, UPDATE, REMOVE ],
               ("optional : BOOL, )
               "gloss" : { LANG : TEXT },
@@ -446,6 +449,9 @@
   language. The UI should display the must appropriate language to the
   user.
 
+  The LENGTH field is required on all new bundles, but may be absent
+  on very old ones.
+
 3.7. File formats: package files
 
    { "_type" : "Package",
@@ -454,13 +460,14 @@
      "version" : VERSION,
      "format" : FMT,
      "ts" : TIME,
-     "files" : [  [ PATH, HASH, INFO ], ... ],
+     "files" : [  [ PATH, HASH, INFO, (LENGTH) ], ... ],
      "shortdesc" : { LANG : DESC, ... },
      "longdesc" : { LANG : DESC, ... },
    }
 
   Most elements are self-explanatory.  To interpret the 'INFO' entry
-  for each installable file, see section 6.
+  for each installable file, see section 6.  The LENGTH field is
+  required on all new packages, but may be absent on very old ones.
 
   No two package files in the same repository should have the same
   name and version.  If a package needs to be changed, the version
@@ -507,6 +514,10 @@
 
   Clients SHOULD cache at least the latest versions they have received
   of all files.
+
+  When dowloading a file, if the client knows what that file's length
+  should be, it SHOULD NOT accept a longer file, and SHOULD NOT
+  continue the download past the file length.
 
 4.1.1. Download preferences
 

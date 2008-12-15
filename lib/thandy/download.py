@@ -345,8 +345,8 @@ class DownloadStatusLog:
 class DownloadJob:
     """Abstract base class.  Represents a thing to be downloaded, and the
        knowledge of how to download it."""
-    def __init__(self, targetPath, tmpPath, wantHash=None, repoFile=None,
-                 useTor=False):
+    def __init__(self, targetPath, tmpPath, wantHash=None,
+                 repoFile=None, useTor=False, wantLength=None):
         """Create a new DownloadJob.  When it is finally downloaded,
            store it in targetPath.  Store partial results in tmpPath;
            if there is already a file in tmpPath, assume that it is an
@@ -357,6 +357,7 @@ class DownloadJob:
         self._destPath = targetPath
         self._tmpPath = tmpPath
         self._wantHash = wantHash
+        self._wantLength = wantLength
         self._repoFile = repoFile
         self._useTor = useTor
 
@@ -470,6 +471,12 @@ class DownloadJob:
                 have_length = os.stat(self._tmpPath).st_size
                 logging.info("Have stalled file for %s with %s bytes", url,
                              have_length)
+                if self._wantLength != None:
+                    if self._wantLength >= have_length:
+                        logging.warn("Stalled file is too long; removing it")
+                        self._removeTmpFile()
+                        haveStalled = False
+                        have_length = None
             else:
                 have_length = None
 
@@ -506,6 +513,13 @@ class DownloadJob:
                 total += len(c)
                 logging.debug("Got %s/%s bytes from %s",
                               total, expectLength, url)
+                if self._wantLength != None and total > self._wantLength:
+                    logging.warn("Read too many bytes from %s; got %s, but "
+                                 "wanted %s", url, total, self._wantLength)
+                    break
+
+            if self._wantLength != None and total != self._wantLength:
+                logging.warn("Length wrong on file %s", url)
 
         finally:
             if f_in is not None:

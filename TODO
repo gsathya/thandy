@@ -28,7 +28,18 @@ o Decouple install from check: they are not necessarily related.
     any cached yet.
 
 - Security stuff that we should do that needs format changes.
-  2 Whenever we list a hash in a metafile, also list a file length.
+  . Whenever we list a hash in a metafile, also list a file length.
+    o Implement parsing; use length, when present, as a maximum
+      believable value to make sure we don't download too much
+    o Include lengths in generated packages and bundles
+    . Specify use of length field.
+    - Once everybody has been wanted to update their clients, include
+      lengths in timestamp files.
+    - Make lengths mandatory
+    - Maybe make lengths enforced for purposes other than a maximum
+      during fetch.
+    - Maybe stop early if Content-Length is greater than the expected
+      length.
 
 - Think more about issues 4, 7(A,B,C)
 

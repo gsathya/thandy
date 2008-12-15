@@ -92,17 +92,20 @@ def makebundle(args):
 
     configFile = args[0]
     packages = {}
+    packageLen = {}
     for pkgFile in args[1:]:
         print "Loading", pkgFile
         f = open(pkgFile, 'r')
         p = json.load(f)
         f.close()
+        packageLen = os.stat(pkgFile).st_size
         _, r, _ = thandy.formats.checkSignedObj(p)
         if r != 'package':
             print pkgFile, "was not a package"
         packages[p['signed']['name']] = p['signed']
 
-    bundleObj = thandy.formats.makeBundleObj(configFile, packages.__getitem__)
+    bundleObj = thandy.formats.makeBundleObj(configFile, packages.__getitem__,
+                                             packageLen.__getitem__)
     signable = thandy.formats.makeSignable(bundleObj)
 
     ks = getKeyStore()
