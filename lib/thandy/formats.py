@@ -4,6 +4,7 @@ import time
 import re
 import binascii
 import calendar
+import os
 
 import thandy.checkJson
 import thandy.util
