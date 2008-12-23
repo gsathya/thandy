@@ -60,6 +60,13 @@ o Decouple install from check: they are not necessarily related.
 - Better configurability: let users override mirrors, keys, etc.
 - Proper exponential back-off on download backend.
 
+- (low priority) some way to delete a package/bundle/etc from
+  the repository. i know that once we add stuff we shouldn't
+  remove it lightly, but if somebody accidentally adds a really
+  high version of something, we will fix it by scrapping the
+  repository and re-inserting everything from the ground up, and
+  that would suck too.
+
 - Wrapping
   - More unit tests
 
