@@ -103,7 +103,7 @@ def makebundle(args):
         if r != 'package':
             print pkgFile, "was not a package"
         packages[p['signed']['name']] = p['signed']
-        packageLen[p['signed']['name'] = length
+        packageLen[p['signed']['name']] = length
 
     bundleObj = thandy.formats.makeBundleObj(configFile, packages.__getitem__,
                                              packageLen.__getitem__)
