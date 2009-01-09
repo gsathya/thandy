@@ -234,7 +234,32 @@ your clients' settings. For example,
 Note that the only bundles listed in a timestamp file are the ones under
 /bundleinfo/ in the repository.
 
+Summary of how to add a new file to the Thandy repository
+---------------------------------------------------------
 
+ssh thandy@moria
+
+cd updater-svn, svn update, make, make test,
+python setup.py install --prefix=/home/thandy/updater-live/
+
+make sure your PATH, PYTHONPATH, and REPOSITORY env variables are
+set right. in theory the thandy dotfiles will do this for you.
+
+cd public_html/thandy/data/win32/ and wget your file
+
+cd updater-svn/config, edit tor-win32-package.cfg to taste
+
+thandy-pk makepackage tor-win32-package.cfg /home/thandy/public_html/thandy/data/win32/tor-xx.msi
+
+thandy-server insert tor-0.2.1.9-alpha.txt
+
+edit tor-win32-bundle.cfg to taste
+
+thandy-pk makebundle tor-win32-bundle.cfg tor-0.2.1.9-alpha.txt
+
+thandy-server insert tor-win32-bundle-0.2.1.9.txt
+
+thandy-server timestamp
 
 FROM THE CLIENT SIDE
 --------------------
