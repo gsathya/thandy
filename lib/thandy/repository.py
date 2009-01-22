@@ -8,7 +8,6 @@ json = thandy.util.importJSON()
 
 import logging
 import os
-import threading
 import time
 
 MAX_TIMESTAMP_AGE = 3*60*60
@@ -89,20 +88,6 @@ class RepositoryFile:
         self._signed_obj = signed_obj
         self._main_obj = main_obj
         self._mtime = mtime
-
-    def _save(self, content=None):
-        """Helper: Flush this object's contents to disk."""
-        if content == None:
-            content = sexpr.encode
-
-        signed_obj,main_obj = self._checkContent(content)
-
-        fname = self.getPath()
-        thandy.util.replaceFile(fname, contents)
-
-        self._signed_obj = signed_obj
-        self._main_obj = main_obj
-        self._mtime = time.time()
 
     def _checkContent(self, content):
         """Helper.  Check whether 'content' matches SIGNED_SCHEMA, and
@@ -279,7 +264,7 @@ class LocalRepository:
                 needRole='bundle')
             return pkg
 
-    def getRequestedFile(self, relPath, pkgSystems=None):
+    def getRequestedFile(self, relPath):
         """DOCDOC"""
         for f in self._metaFiles:
             if f.getRelativePath() == relPath:

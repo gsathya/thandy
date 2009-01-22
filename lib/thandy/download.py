@@ -4,11 +4,9 @@ import httplib
 import logging
 import os
 import Queue
-import random
 import sys
 import threading
 import time
-import traceback
 import urllib2
 
 import thandy.util

@@ -141,7 +141,7 @@ def checkSignatures(signed, keyDB, role=None, path=None):
         except thandy.UnknownMethod:
             continue
 
-        if result == True:
+        if result:
             if role is not None:
                 for r,p in key.getRoles():
                     if r == role and rolePathMatches(p, path):
@@ -326,7 +326,7 @@ def parseTime(s):
     try:
         return calendar.timegm(time.strptime(s, "%Y-%m-%d %H:%M:%S"))
     except ValueError:
-        raise thandy.FormatError("Malformed time %r", s)
+        raise thandy.FormatException("Malformed time %r", s)
 
 def formatBase64(h):
     """Return the base64 encoding of h with whitespace and = signs omitted."""
@@ -343,12 +343,12 @@ def parseBase64(s):
     try:
         return binascii.a2b_base64(s)
     except binascii.Error:
-        raise thandy.FormatError("Invalid base64 encoding")
+        raise thandy.FormatException("Invalid base64 encoding")
 
 def parseHash(s):
     h = parseBase64(s)
     if len(h) != Crypto.Hash.SHA256.digest_size:
-        raise thandy.FormatError("Bad hash length")
+        raise thandy.FormatException("Bad hash length")
     return h
 
 S = thandy.checkJson
@@ -533,11 +533,6 @@ class Key:
         keytype = obj['_keytype']
         if keytype == 'rsa':
             return Key(thandy.keys.RSAKey.fromJSon(obj))
-
-        if typeattr == 'rsa':
-            key = thandy.keys.RSAKey.fromSExpression(sexpr)
-            if key is not None:
-                return Key(key)
         else:
             return None
 
@@ -547,10 +542,10 @@ class Key:
     def getKeyID(self):
         return self.key.getKeyID()
 
-    def sign(self, sexpr=None, digest=None):
-        return self.key.sign(sexpr, digest=digest)
+    def sign(self, obj=None, digest=None):
+        return self.key.sign(obj, digest=digest)
 
-    def checkSignature(self, method, data, signatute):
+    def checkSignature(self, method, data, signature):
         ok = self.key.checkSignature(method, data, signature)
         # XXXX CACHE HERE.
         return ok
@@ -651,7 +646,7 @@ def readConfigFile(fname, needKeys=(), optKeys=(), preload={}):
         try:
             result[k] = parsed[k]
         except KeyError:
-            raise thandy.FormatError("Missing value for %s in %s"%k,fname)
+            raise thandy.FormatException("Missing value for %s in %s"%k,fname)
 
     for k in optKeys:
         try:
@@ -916,8 +911,7 @@ def checkSignedObj(obj, keydb=None):
         role = 'package'
         path = obj['signed']['location']
     else:
-        print tp
-        raise "Foo"
+        raise ValueError("Unkown signed object type %r"%tp)
 
     ss = None
     if keydb is not None:

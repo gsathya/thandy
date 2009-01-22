@@ -5,7 +5,6 @@ import Crypto.PublicKey.RSA
 import Crypto.Hash.SHA256
 import Crypto.Cipher.AES
 
-import cPickle as pickle
 import binascii
 import logging
 import os
@@ -24,7 +23,7 @@ class PublicKey:
         self._roles = []
     def format(self):
         raise NotImplemented()
-    def sign(self, data):
+    def sign(self, data=None, digest=None):
         # returns a list of method,signature tuples.
         raise NotImplemented()
     def checkSignature(self, method, data, signature):
@@ -213,7 +212,7 @@ class RSAKey(PublicKey):
     def checkSignature(self, method, sig, obj=None, digest=None):
         assert _xor(obj == None, digest == None)
         if method != "sha256-pkcs1":
-            raise UnknownMethod(method)
+            raise thandy.UnknownMethod(method)
         if digest == None:
             digest = thandy.formats.getDigest(obj)
         sig = base64ToInt(sig)

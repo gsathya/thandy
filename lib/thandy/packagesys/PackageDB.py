@@ -42,7 +42,7 @@ class SimplePackageDB:
         return self._db.get('pi_%s'%str(package))
 
     def getManifest(self, package):
-        return self._db.get('mf_%'%str(package), {})
+        return self._db.get('mf_%s'%str(package), {})
 
     def removeAll(self, package):
         for template in ["pv_%s", "ip_%s", "mf_%s"]:
@@ -59,7 +59,7 @@ def getPackageDBInstance():
         fname = thandy.util.userFilename("db/packages")
         logging.info("Opening package database in %s", fname)
         _DB_INSTANCE = SimplePackageDB(fname)
-    return _DB_INSTANCEx
+    return _DB_INSTANCE
 
 class _DBMixin:
     def setDB(self, db):
@@ -110,7 +110,7 @@ class DBChecker(PS.Checker, _DBMixin):
         return [ self.getDB().getCurVersion(self._name) ]
 
     def isInstalled(self):
-        return self._version in self.getInstalledVersions(transaction)
+        return self._version in self.getInstalledVersions()
 
 class DBInstaller(PS.Installer, _DBMixin):
     def __init__(self, name, version, relPath, installer):

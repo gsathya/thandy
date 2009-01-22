@@ -70,7 +70,7 @@ class SocksHTTPConnection(httplib.HTTPConnection):
 class SocksHTTPSConnection(httplib.HTTPSConnection):
     def connect(self):
         socket = socks_connect(self.host, self.port)
-        ssl = socket.ssl(sock, None, None)
+        ssl = socket.ssl(socket, None, None)
         self.sock = socket.FakeSocket(socket, ssl)
 
 # URL handlers for HTTP and HTTPS urls that use socks instead of direct

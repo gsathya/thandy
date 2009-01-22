@@ -124,7 +124,7 @@ class PackageItem:
     def setTransaction(self, transaction):
         """Set the transaction context for this item to 'transaction'.
         """
-        if self._cheker is not None:
+        if self._checker is not None:
             self._checker.setTransaction(transaction)
         if self._installer is not None:
             self._installer.setTransaction(transaction)
@@ -174,12 +174,12 @@ class Checker:
            installed.  Version types are item-dependent: a tuple or a
            string is most common.
         """
-        raise NotImplemented
+        raise NotImplemented()
 
     def isInstalled(self):
         """Return true iff this particular version of this item is installed.
         """
-        raise NotImplemented
+        raise NotImplemented()
 
 class Installer:
     """Abstract base class.  An Installer knows how to install or remove an

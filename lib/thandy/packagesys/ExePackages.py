@@ -36,8 +36,8 @@ class CommandInstaller(PS.Installer):
     def __repr__(self):
         parts = [ "CommandInstaller(%r, %r" %(self._relPath,
                                               self._installCommand) ]
-        if self.removeCommand:
-            parts.append(", %r"%self.removeCommand)
+        if self._removeCommand:
+            parts.append(", %r"%self._removeCommand)
         parts.append(")")
         return "".join(parts)
 

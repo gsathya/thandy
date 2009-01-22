@@ -106,7 +106,7 @@ def checkRPMInstall(name, version, ts=None):
         for fname, flags, md5sum in zip(h['filenames'], h['fileflags'], h['filemd5s']):
             haveMD5 = fileMD5(fname)
             if not haveMD5:
-                if flags & RPMFILE_MISSINGOK:
+                if (flags & rpm.RPMFILE_MISSINGOK):
                     logging.info("%s is missing or unreadable from %s %s; "
                                  "that's ok.", fname, name, h['version'])
                 else:
@@ -118,7 +118,7 @@ def checkRPMInstall(name, version, ts=None):
                              fname, name, h['version'])
             else:
                 # file changed.  If it's not configuration, that's a problem.
-                if not flags & RPMFILE_CONFIG:
+                if not (flags & rpm.RPMFILE_CONFIG):
                     logging.warn("%s changed from installed version of %s %s",
                                  fname, name, h['version'])
                     all_ok = False

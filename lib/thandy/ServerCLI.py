@@ -144,7 +144,7 @@ def timestamp(args):
             try:
                 bObj = snarfObj(fn)
             except (ValueError, OSError, IOError), e:
-                print "(Couldn't read bundle-like %s)"%fn
+                print "(Couldn't read bundle-like %s: %s)"%(fn, e)
                 continue
             try:
                 _, r, _ = thandy.formats.checkSignedObj(bObj)

@@ -191,7 +191,7 @@ def getRegistryValue(keyname):
         try:
             settings = _winreg.OpenKey(base, key)
             return _winreg.QueryValueEx(settings, value)[0]
-        except (WindowsError, ValueError, TypeError):
+        except (OSError, ValueError, TypeError):
             return None
     finally:
         if settings is not None:

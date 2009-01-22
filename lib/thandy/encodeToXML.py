@@ -1,6 +1,7 @@
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
 import re
+import thandy
 
 def xml_str_encoder(s):
     s = s.replace("&", "&amp;")
@@ -23,7 +24,7 @@ def isAsciiName(s):
     """
     return re.match(r'^[A-Za-z\_\:][A-Za-z0-9\_\:\-\.]*$', s) != None
 
-def _encodeToXML(obj, outf, indent=0):
+def _encodeToXML(obj, outf):
     if isinstance(obj, basestring):
         outf(xml_str_encoder(obj))
     elif obj is True:
@@ -35,7 +36,6 @@ def _encodeToXML(obj, outf, indent=0):
     elif isinstance(obj, (int,long)):
         outf(str(obj))
     elif isinstance(obj, (tuple, list)):
-        istr = " "*indent
         outf("<list>\n")
         for item in obj:
             outf("<item>")
@@ -62,6 +62,7 @@ def encodeToXML(obj, outf=None):
     """Convert a json-encodable object to a quick-and-dirty XML equivalent."""
     result = None
     if outf == None:
+        result = []
         outf = result.append
 
     _encodeToXML(obj, outf)

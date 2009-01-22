@@ -32,7 +32,7 @@ class ControlLogFormatter:
                                 thandy.util.formatLogString(m))
 
     def formatException(self, exc_info):
-        return repr(traceback.print_exception())
+        return repr(traceback.format_exception(*exc_info))
 
 class RegularLogFilter:
     def filter(self, record):
@@ -76,7 +76,6 @@ def update(args):
     use_packagesys = True
     install = False
     socksPort = None
-    logLevel = logging.INFO
     forceCheck = False
 
     for o, v in options:
