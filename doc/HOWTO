@@ -88,7 +88,7 @@ so long as there is no other key in ~/.thandy/secret_keys that starts with iC.
 
 To remove a role from a key, run:
 
-    thandy-pk delrole {KEYID} {filetype} {path}
+    thandy-pk delrole {KEYID} {role} {path}
 
 To export the public parts of a key and its roles, run:
 
