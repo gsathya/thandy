@@ -24,7 +24,8 @@ def snarf(fname):
 def snarfObj(fname):
     f = open(fname, 'r')
     try:
-        return json.load(f)
+        length = os.fstat(f.fileno()).st_size
+        return json.load(f), length
     finally:
         f.close()
 
@@ -127,12 +128,12 @@ def timestamp(args):
     tsFname = os.path.join(repo, "meta/timestamp.txt")
 
     try:
-        mObj = snarfObj(os.path.join(repo, "meta/mirrors.txt"))
+        mObj, mLen = snarfObj(os.path.join(repo, "meta/mirrors.txt"))
     except OSError:
         print "No mirror list!"
         sys.exit(1)
     try:
-        kObj = snarfObj(os.path.join(repo, "meta/keys.txt"))
+        kObj, kLen = snarfObj(os.path.join(repo, "meta/keys.txt"))
     except OSError:
         print "No key list!"
         sys.exit(1)
@@ -142,7 +143,7 @@ def timestamp(args):
         for fn in fns:
             fn = os.path.join(dirpath, fn)
             try:
-                bObj = snarfObj(fn)
+                bObj, bLen = snarfObj(fn)
             except (ValueError, OSError, IOError), e:
                 print "(Couldn't read bundle-like %s: %s)"%(fn, e)
                 continue
@@ -154,10 +155,11 @@ def timestamp(args):
             if r != "bundle":
                 print "%s was not a good bundle"%fn
                 continue
-            bundles.append(bObj['signed'])
+            bundles.append((bObj['signed'], bLen))
 
     timestamp = thandy.formats.makeTimestampObj(
-        mObj['signed'], kObj['signed'], bundles)
+        mObj['signed'], mLen, kObj['signed'], kLen,
+        bundles)
     signable = thandy.formats.makeSignable(timestamp)
 
     keydb = thandy.formats.Keylist()

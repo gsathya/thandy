@@ -794,19 +794,22 @@ def getBundleKey(bundlePath):
     idx = bundlePath.rindex("/")
     return bundlePath[:idx+1]
 
-def makeTimestampObj(mirrorlist_obj, keylist_obj,
+def makeTimestampObj(mirrorlist_obj, mirrorlist_len,
+                     keylist_obj, keylist_len,
                      bundle_objs):
     result = { '_type' : 'Timestamp',
                'at' : formatTime(time.time()) }
     result['m'] = [ mirrorlist_obj['ts'],
-                    formatHash(getDigest(mirrorlist_obj)) ]
+                    formatHash(getDigest(mirrorlist_obj)),
+                    mirrorlist_len ]
     result['k'] = [ keylist_obj['ts'],
-                    formatHash(getDigest(keylist_obj)) ]
+                    formatHash(getDigest(keylist_obj)),
+                    keylist_len ]
     result['b'] = bundles = {}
-    for bundle in bundle_objs:
+    for bundle, bundleLen in bundle_objs:
         k = getBundleKey(bundle['location'])
         v = bundle['version']
-        entry = [ v, bundle['location'], bundle['at'], formatHash(getDigest(bundle)) ]
+        entry = [ v, bundle['location'], bundle['at'], formatHash(getDigest(bundle)), bundleLen ]
         if not bundles.has_key(k) or versionIsNewer(v, bundles[k][0]):
             bundles[k] = entry
 

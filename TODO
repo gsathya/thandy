@@ -33,7 +33,7 @@ o Decouple install from check: they are not necessarily related.
       believable value to make sure we don't download too much
     o Include lengths in generated packages and bundles
     . Specify use of length field.
-    - Once everybody has been wanted to update their clients, include
+    o Once everybody has been wanted to update their clients, include
       lengths in timestamp files.
     - Make lengths mandatory
     - Maybe make lengths enforced for purposes other than a maximum
