@@ -264,8 +264,8 @@ thandy-server timestamp
 FROM THE CLIENT SIDE
 --------------------
 
-svn checkout https://svn.torproject.org/svn/updater/trunk updater
-cd updater
+git clone --depth 1 git://git.torproject.org/git/thandy
+cd thandy
 make
 make test
 python setup.py install --prefix=/home/thandy/install
