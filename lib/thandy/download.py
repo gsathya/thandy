@@ -542,9 +542,11 @@ class SimpleDownloadJob(DownloadJob):
     """Testing subtype of DownloadJob: just downloads a URL and writes it to
        disk."""
     def __init__(self, targetPath, url,
-                 wantHash=None, supportedURLTypes=None, useTor=False):
+                 wantHash=None, supportedURLTypes=None, useTor=False,
+                 wantLength=None):
         DownloadJob.__init__(self, targetPath, targetPath+".tmp",
                                  wantHash=wantHash,
+                                 wantLength=length,
                                  useTor=useTor)
         self._url = url
 
@@ -579,9 +581,10 @@ class ThandyDownloadJob(DownloadJob):
        and Thandy's directory structure."""
     def __init__(self, relPath, destPath, mirrorList, wantHash=None,
                  supportedURLTypes=None, useTor=None, repoFile=None,
-                 downloadStatusLog=None):
+                 downloadStatusLog=None, wantLength=None):
 
         DownloadJob.__init__(self, destPath, None, wantHash=wantHash,
+                             wantLength=wantLength,
                              useTor=useTor, repoFile=repoFile)
         self._mirrorList = mirrorList
         self._relPath = relPath

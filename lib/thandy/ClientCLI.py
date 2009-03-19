@@ -108,9 +108,11 @@ def update(args):
     # until all downloading files are finished.
     while True:
         hashes = {}
+        lengths = {}
         installable = {}
         logging.info("Checking for files to update.")
         files = repo.getFilesToUpdate(trackingBundles=args, hashDict=hashes,
+                                      lengthDict=lengths,
                                       usePackageSystem=use_packagesys,
                                       installableDict=installable)
 
@@ -186,6 +188,7 @@ def update(args):
                 f, repo.getFilename(f),
                 mirrorlist,
                 wantHash=hashes.get(f),
+                wantLength=lengths.get(f),
                 repoFile=repo.getRequestedFile(f),
                 useTor=(socksPort!=None))
 
