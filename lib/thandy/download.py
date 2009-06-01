@@ -423,7 +423,7 @@ class DownloadJob:
 
     def setDownloadStatusLog(self, log):
         """Base our URL-picking decisions on the DownloadStatusLog in
-           'log'.  The caller is still reposnsible for invoking the
+           'log'.  The caller is still responsible for invoking the
            logs failed() or succeeded methods.  XXXX is that bad API
            design?"""
         pass

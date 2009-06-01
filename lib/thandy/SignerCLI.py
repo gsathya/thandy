@@ -3,7 +3,6 @@
 import os
 import getopt
 import sys
-import logging
 
 import thandy.keys
 import thandy.formats

@@ -914,7 +914,7 @@ def checkSignedObj(obj, keydb=None):
         role = 'package'
         path = obj['signed']['location']
     else:
-        raise ValueError("Unkown signed object type %r"%tp)
+        raise ValueError("Unknown signed object type %r"%tp)
 
     ss = None
     if keydb is not None:

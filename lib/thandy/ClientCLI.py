@@ -1,9 +1,8 @@
+import thandy.bt_compat
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
 import getopt
 import logging
-import os
-import re
 import sys
 import time
 import traceback

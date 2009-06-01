@@ -290,7 +290,7 @@
           S is a signature of the canonical encoding of X using the
           identified key.
 
-   We define one signing methods at present:
+   We define one signing method at present:
        sha256-pkcs1 : A signature of the SHA256 hash of the canonical
          encoding of X, using PKCS-1 padding.
 
@@ -665,7 +665,7 @@
   KEY must be unique across the thandy repository.  It identifies
   this kind of installable item uniquely.  VAL is the version of this
   item.  When Thandy installs the item, it writes a persistent mapping
-  from KEY to VAL to a local database.  The item is instaleld if such
+  from KEY to VAL to a local database.  The item is installed if such
   a mapping is found to exist.
 
 
