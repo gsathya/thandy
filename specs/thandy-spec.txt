@@ -17,8 +17,6 @@
    as "Thandy" (which could stand for Tor's Handy pocket creature if
    you want it to, or which could also be a person's first name).
 
-   Some of this document still refers to "Glider", and needs to be updated.
-
 0.2. Non-goals
 
    This is not meant to replace any existing download mechanism for
