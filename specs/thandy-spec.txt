@@ -398,7 +398,7 @@
       "m" : [ TIME, HASH, LENGTH ],
       "k" : [ TIME, HASH, LENGTH ],
       "b" : { NAME :
-                 [ [ Version, Path, Time, Hash, (Length) ] ] }
+                 [ [ Version, Path, Time, Hash, Length ] ] }
     }
 
   TIME is when the timestamp was signed.  MIRRORLISTHASH is the digest
@@ -406,8 +406,6 @@
   file; and the 'b' entries are a list of the latest version of all
   bundles and their locations and hashes.  The "name" of a bundle (in
   this context) is the directory component of the bundle's path.
-
-  The LENGTH field may be absent on very old timestamp files.
 
 3.6. File formats: bundle files
 
@@ -423,7 +421,7 @@
               "version" : VERSION,
               "path" : PATH,
               "hash" : HASH,
-              ("length" : LENGTH),
+              "length" : LENGTH,
               "order" : [ INST, UPDATE, REMOVE ],
               ("optional : BOOL, )
               "gloss" : { LANG : TEXT },
@@ -447,9 +445,6 @@
   language. The UI should display the must appropriate language to the
   user.
 
-  The LENGTH field is required on all new bundles, but may be absent
-  on very old ones.
-
 3.7. File formats: package files
 
    { "_type" : "Package",
@@ -458,14 +453,13 @@
      "version" : VERSION,
      "format" : FMT,
      "ts" : TIME,
-     "files" : [  [ PATH, HASH, INFO, (LENGTH) ], ... ],
+     "files" : [  [ PATH, HASH, INFO, LENGTH ], ... ],
      "shortdesc" : { LANG : DESC, ... },
      "longdesc" : { LANG : DESC, ... },
    }
 
   Most elements are self-explanatory.  To interpret the 'INFO' entry
-  for each installable file, see section 6.  The LENGTH field is
-  required on all new packages, but may be absent on very old ones.
+  for each installable file, see section 6.
 
   No two package files in the same repository should have the same
   name and version.  If a package needs to be changed, the version

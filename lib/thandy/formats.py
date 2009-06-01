@@ -438,7 +438,7 @@ BUNDLE_SCHEMA = S.Obj(
                     version=VERSION_SCHEMA,
                     path=RELPATH_SCHEMA,
                     hash=HASH_SCHEMA,
-                    length=S.Opt(LENGTH_SCHEMA),
+                    length=LENGTH_SCHEMA,
                     order=S.Struct([S.Int(), S.Int(), S.Int()]),
                     optional=S.Opt(S.Bool()),
                     gloss=S.DictOf(S.AnyStr(), S.AnyStr()),
@@ -771,9 +771,7 @@ def makeBundleObj(config_fname, getPackage, getPackageLength):
             raise thandy.FormatException("No such package as %s"%p['name'])
 
         p['hash'] = formatHash(getDigest(pkginfo))
-        length = getPackageLength(p['name'])
-        if length != None:
-            p['length'] = length
+        p['length'] = getPackageLength(p['name'])
         if p['path'] == None:
             p['path'] = pkginfo['location']
         if p['version'] == None:
