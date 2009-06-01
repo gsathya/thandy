@@ -692,22 +692,6 @@
   install it itself.
 
 
-6.99 The obsolete way to install files from packages.
-
-  If an item has no checkType and its package's "format" field is
-  present and set to 'exe', there is an obsolete way to check and
-  install items.  This will no longer be supported once packages of
-  this type are no longer generated, and no longer latest in any
-  bundle.
-
-  If an item in such a package has a registry_ent field in its INFO,
-  its presence is detected in the registry as with
-  check_type=registry_ent.  Otherwise, checking is done with an entry
-  based on the package's name and version in Thandy's internal DB.
-
-  To install such an item, the item itself is executed, with arguments
-  taken from an exe_args list in its INFO.
-
 F. Future directions and open questions
 
 F.1. Package decomposition
