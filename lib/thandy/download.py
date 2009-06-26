@@ -470,7 +470,7 @@ class DownloadJob:
                 logging.info("Have stalled file for %s with %s bytes", url,
                              have_length)
                 if self._wantLength != None:
-                    if self._wantLength >= have_length:
+                    if self._wantLength <= have_length:
                         logging.warn("Stalled file is too long; removing it")
                         self._removeTmpFile()
                         haveStalled = False
