@@ -394,6 +394,9 @@ class LocalRepository:
         # Okay; that's it for the metadata.  Do we have the right
         # bundles?
         bundles = {}
+        if len(trackingBundles) == 1 and trackingBundles[0] == "**":
+            trackingBundles = ts.getBundleInfos()
+
         for b in trackingBundles:
             try:
                 binfo = ts.getBundleInfo(b)

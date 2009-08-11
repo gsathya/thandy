@@ -219,6 +219,7 @@ def usage():
     print "         [--no-packagesys] [--install] [--socks-port=port]"
     print "         [--debug|--info|--warn] [--force-check]"
     print "         [--controller-log-format]"
+    print "         bundle1, bundle2, ..."
     print "  json2xml file"
     sys.exit(1)
 

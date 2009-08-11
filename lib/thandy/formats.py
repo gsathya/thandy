@@ -637,6 +637,9 @@ class TimestampFile:
     def getBundleInfo(self, name):
         return self._bundleInfo[name]
 
+    def getBundleInfos(self):
+        return self._bundleInfo
+
 def readConfigFile(fname, needKeys=(), optKeys=(), preload={}):
     parsed = preload.copy()
     result = {}
