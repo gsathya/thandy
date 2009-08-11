@@ -134,6 +134,16 @@ if 'py2exe' in sys.argv:
                             }
     }
 
+# Install the BitTorrent package if it is present.
+# XXX If there is an easy way to make sure we're using the patched version
+#     of the BitTorrent library, this would be worthwile to detect.
+pkg_dir={ '' : 'lib' }
+pkgs = ['thandy', 'thandy.packagesys']
+for k, dir in pkg_dir.iteritems():
+    if os.path.exists(os.path.join(dir, 'BitTorrent')):
+        pkgs.append('BitTorrent')
+        print "Building with BitTorrent support."
+
 setup(name='Thandy',
       version=VERSION,
       license="3-clause BSD",
@@ -142,8 +152,8 @@ setup(name='Thandy',
       author="Nick Mathewson",
       author_email="nickm@freehaven.net",
       url="http://www.torproject/org",
-      package_dir={ '' : 'lib' },
-      packages=['thandy', 'thandy.packagesys'],
+      package_dir=pkg_dir,
+      packages=pkgs,
       scripts=SCRIPTS,
       cmdclass={'install': InstallCommand},
       **extra_args

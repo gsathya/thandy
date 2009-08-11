@@ -14,9 +14,15 @@ INSTALLATION
 3) Install the pycrypto python module.
    (on Debian, apt-get install python-crypto)
 
-4) make test
+4) (optional) Fetch the BitTorrent 3.4.2 sources as well as the Debian
+   patches ( http://patch-tracking.debian.net/package/bittorrent ) and
+   put the patched BitTorrent directory into lib/. The files from the
+   BitTorrent 3.4.2 package that are outside the BitTorrent directory
+   can be discarded.
 
-5) make install
+5) make test
+
+6) make install
 
    [If you don't have root, or don't want to put it in the usual places,
         python setup.py install --prefix={WHATEVER}
