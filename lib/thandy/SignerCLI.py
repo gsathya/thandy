@@ -7,6 +7,7 @@ import sys
 import thandy.keys
 import thandy.formats
 import thandy.util
+import thandy.bt_compat
 
 json = thandy.util.importJSON()
 
@@ -77,6 +78,19 @@ def makepackage(args):
     print "Writing signed package to %s"%location
     f = open(location, 'w')
     json.dump(signable, f, indent=1, sort_keys=True)
+    f.close()
+    btcomp = thandy.bt_compat.BtCompat()
+    # If we have bittorrent support, we always create the appropriate metadata.
+    thandy.bt_compat.BtCompat.setUseBt(True)
+    if not thandy.bt_compat.BtCompat.shouldUseBt():
+        print "Not generating BitTorrent metadata files"
+        return
+    print "Generating BitTorrent metadata file"
+    metaFile = btcomp.makeMetaFile(dataFile)
+    mfLocation = os.path.split(btcomp.getBtMetadataLocation(location, dataFile))[-1]
+    print "Writing BitTorrent Metadata file to %s"%mfLocation
+    f = open(mfLocation, 'w')
+    f.write(metaFile)
     f.close()
 
 def makebundle(args):

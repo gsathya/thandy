@@ -217,7 +217,8 @@ and notes:
 
     * For the actual data files (i.e. the packages themselves), for now you
       just copy them into the repository manually. Later there will be some
-      version of thandy-server insert that handles them too.
+      version of thandy-server insert that handles them too. The same goes
+      for the BitTorrent metadata files.
 
 .GENERATING TIMESTAMPS.
 

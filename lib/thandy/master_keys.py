@@ -17,3 +17,6 @@ DEFAULT_MIRRORLIST = {
                 }
              ],
 }
+
+DEFAULT_TRACKER = NONE
+

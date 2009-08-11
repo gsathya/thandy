@@ -248,6 +248,12 @@
          file that makes up a package, its hash, and what procedure
          is used to install it.
 
+    /pkginfo/packagename/os-arch/version/(some filename).torrent
+
+         The .torrent metadata file used to download that file. The
+         file name is exactly the same as specified in the package
+         file.
+
     /packages/packagename/os-arch/version/(some filename)
 
          The actual package file.  Its naming convention will depend
