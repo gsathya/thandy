@@ -2,6 +2,7 @@
 
 import os.path
 import time
+import threading
 
 import thandy.master_keys
 
@@ -73,4 +74,59 @@ class BtCompat:
         data = {'info': info, 'announce': self.tUrl,
                 'creation date': long(time.time())}
         return BitTorrent.bencode.bencode(data)
+
+    def getFileLength(self, file):
+        """Parse the .torrent metainfo file and return the length of the
+           file it refers to.
+        """
+        f = open(file, 'rb')
+        metainfo = BitTorrent.bencode.bdecode(f.read())['info']
+        f.close()
+        assert(metainfo['length'])
+        return metainfo['length']
+
+    def getFileHash(self, file):
+        """Parse the .torrent metainfo file and return the hash of the
+           file it refers to.
+        """
+        f = open(file, 'rb')
+        metainfo = BitTorrent.bencode.bdecode(f.read())['info']
+        f.close()
+        return sha(BitTorrent.bencode.bencode(metainfo)).hexdigest()
+
+    def download(self, metaFile, saveTo ):
+        """Initiate a download via bittorrent."""
+
+        event = threading.Event()
+
+        params = ['--responsefile', metaFile, '--saveas', saveTo]
+
+        def filefunc(default, size, saveas, dir):
+            return saveas
+
+        def statusfunc(dict):
+            # XXX we should see how fast we upload/download here.
+            # If we don't get a connection for quite a while, or we are
+            # _very_ slow, we should cancel bt, disable it, and start fetching
+            # via http.
+            pass
+
+        def finfunc():
+            # XXX here we can set a timer for how long to seed, or
+            # wait for statusfunc to have shared some data, or something.
+            # Not the real solution, though, because installation will be
+            # delayed by the time we sleep...
+            # time.sleep(60)
+            event.set()
+            pass
+
+        def errorfunc(msg):
+            # XXX Not really sure how to encounter an error here. Our best bet
+            # is to cancel the download, stop bittorrent, and move on.
+            BtCompat.setUseBt(False)
+            event.set()
+
+
+        BitTorrent.download.download(params, filefunc, statusfunc, finfunc,
+                                     errorfunc, event, 80)
 

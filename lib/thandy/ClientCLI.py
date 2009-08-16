@@ -68,7 +68,8 @@ def update(args):
     options, args = getopt.getopt(args, "",
         [ "repo=", "no-download", "loop", "no-packagesys",
           "install", "socks-port=", "debug", "info",
-          "warn", "force-check", "controller-log-format"
+          "warn", "force-check", "controller-log-format",
+          "download-method="
           ])
     download = True
     keep_looping = False
@@ -76,6 +77,7 @@ def update(args):
     install = False
     socksPort = None
     forceCheck = False
+    downloadMethod = "direct"
 
     for o, v in options:
         if o == '--repo':
@@ -92,11 +94,19 @@ def update(args):
             socksPort = int(v)
         elif o == '--force-check':
             forceCheck = True
+        elif o == '--download-method':
+            downloadMethod = v
 
     configureLogs(options)
 
     if socksPort:
         thandy.socksurls.setSocksProxy("127.0.0.1", socksPort)
+
+    if downloadMethod == "bittorrent":
+        thandy.bt_compat.BtCompat.setUseBt(True)
+    elif downloadMethod != "direct":
+        usage()
+        sys.exit()
 
     repo = thandy.repository.LocalRepository(repoRoot)
     downloader = thandy.download.DownloadManager()
@@ -109,11 +119,15 @@ def update(args):
         hashes = {}
         lengths = {}
         installable = {}
+        btMetadata = {}
         logging.info("Checking for files to update.")
-        files = repo.getFilesToUpdate(trackingBundles=args, hashDict=hashes,
-                                      lengthDict=lengths,
-                                      usePackageSystem=use_packagesys,
-                                      installableDict=installable)
+        files, downloadingFiles = repo.getFilesToUpdate(
+              trackingBundles=args,
+              hashDict=hashes,
+              lengthDict=lengths,
+              usePackageSystem=use_packagesys,
+              installableDict=installable,
+              btMetadataDict=btMetadata)
 
         if forceCheck:
             files.add("/meta/timestamp.txt")
@@ -183,13 +197,23 @@ def update(args):
                 logging.info("Waiting a while before we fetch %s", f)
                 continue
 
-            dj = thandy.download.ThandyDownloadJob(
-                f, repo.getFilename(f),
-                mirrorlist,
-                wantHash=hashes.get(f),
-                wantLength=lengths.get(f),
-                repoFile=repo.getRequestedFile(f),
-                useTor=(socksPort!=None))
+            dj = None
+            if thandy.bt_compat.BtCompat.shouldUseBt() and downloadingFiles:
+                dj = thandy.download.ThandyBittorrentDownloadJob(
+                    repo.getFilename(btMetadata[f]), f,
+                    repo.getFilename(f),
+                    wantHash=hashes.get(f),
+                    wantLength=lengths.get(f),
+                    repoFile=repo.getRequestedFile(f))
+
+            else:
+                dj = thandy.download.ThandyDownloadJob(
+                    f, repo.getFilename(f),
+                    mirrorlist,
+                    wantHash=hashes.get(f),
+                    wantLength=lengths.get(f),
+                    repoFile=repo.getRequestedFile(f),
+                    useTor=(socksPort!=None))
 
             def successCb(rp=f):
                 rf = repo.getRequestedFile(rp)
@@ -219,6 +243,7 @@ def usage():
     print "         [--no-packagesys] [--install] [--socks-port=port]"
     print "         [--debug|--info|--warn] [--force-check]"
     print "         [--controller-log-format]"
+    print "         [--download-method=direct|bittorrent]"
     print "         bundle1, bundle2, ..."
     print "  json2xml file"
     sys.exit(1)

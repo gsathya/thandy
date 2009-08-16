@@ -3,12 +3,14 @@
 import thandy.formats
 import thandy.util
 import thandy.packagesys.PackageSystem
+import thandy.bt_compat
 
 json = thandy.util.importJSON()
 
 import logging
 import os
 import time
+import sys
 
 MAX_TIMESTAMP_AGE = 3*60*60
 
@@ -285,9 +287,10 @@ class LocalRepository:
 
     def getFilesToUpdate(self, now=None, trackingBundles=(), hashDict=None,
                          lengthDict=None, usePackageSystem=True,
-                         installableDict=None):
+                         installableDict=None, btMetadataDict=None):
         """Return a set of relative paths for all files that we need
-           to fetch.  Assumes that we care about the bundles
+           to fetch, and True if we're fetching actual files to install
+           instead of metadata.  Assumes that we care about the bundles
            'trackingBundles'.
            DOCDOC installableDict, hashDict, usePackageSystem
         """
@@ -304,6 +307,9 @@ class LocalRepository:
 
         if lengthDict == None:
             lengthDict = {}
+
+        if btMetadataDict == None:
+            btMetadataDict = {}
 
         pkgItems = None
 
@@ -341,7 +347,7 @@ class LocalRepository:
                 need.add(self._keylistFile.getRelativePath())
 
         if need:
-            return need
+            return need, False
 
         # Import the keys from the keylist.
         self._keyDB.addFromKeylist(self._keylistFile.get())
@@ -354,7 +360,7 @@ class LocalRepository:
                          "timestamp file and keylist.")
             need.add(self._keylistFile.getRelativePath())
             need.add(self._timestampFile.getRelativePath())
-            return need
+            return need, False
 
         # FINALLY, we know we have an up-to-date, signed timestamp
         # file.  Check whether the keys and mirrors file are as
@@ -375,7 +381,7 @@ class LocalRepository:
             need.add(self._keylistFile.getRelativePath())
 
         if need:
-            return need
+            return need, False
 
         s = self._mirrorlistFile.checkSignatures()
         if not s.isValid():
@@ -389,7 +395,7 @@ class LocalRepository:
             need.add(self._mirrorlistFile.getRelativePath())
 
         if need:
-            return need
+            return need, False
 
         # Okay; that's it for the metadata.  Do we have the right
         # bundles?
@@ -459,10 +465,34 @@ class LocalRepository:
                 s = pfile.checkSignatures()
                 if not s.isValid():
                     logging.warn("Package hash was as expected, but signature "
-                                 "did nto match")
+                                 "did not match")
                     # Can't use it.
                     continue
                 packages[rp] = pfile
+
+        # We have the packages. If we're downloading via bittorrent, we need
+        # the .torrent metafiles, as well.
+        if thandy.bt_compat.BtCompat.shouldUseBt():
+            btcomp = thandy.bt_compat.BtCompat()
+            for pfile in packages.values():
+                package = pfile.get()
+                for f in package['files']:
+                    rp = btcomp.getBtMetadataLocation(pfile.getRelativePath(),f[:1][0])
+                    try:
+                        l = btcomp.getFileLength(self.getFilename(rp))
+                    except IOError:
+                        need.add(rp)
+                        continue
+                    # XXX The following sanity check is a weak hack.
+                    # In reality, we want to check a signature here.
+                    if l != f[3:4][0]:
+                        # We got a bad .torrent file. Disable BitTorrent.
+                        logging.warn("Disable BitTorrent, bad metadata file!")
+                        thandy.bt_compat.BtCompat.setUseBt(False)
+                    btMetadataDict[f[:1][0]] = rp
+
+        if need:
+            return need, False
 
         # Finally, we have some packages.  Do we have their underlying
         # files?
@@ -514,8 +544,12 @@ class LocalRepository:
                     logging.info("Hash for %s not as expected; must load.", rp)
                     need.add(rp)
                 else:
+                    # XXX What if not? Maybe this should always be true.
+                    # if that works, we can get rid of the second return
+                    # value and just use installableDict from the caller.
                     if pkgItems.has_key(rp):
                         installableDict.setdefault(pkg_rp, {})[rp] = pkgItems[rp]
 
+
         # Okay; these are the files we need.
-        return need
+        return need, True

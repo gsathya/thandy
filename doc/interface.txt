@@ -39,6 +39,12 @@ Recognized options for thandy-client update are:
                    Output log messages in a format designed to be easy
                    for controllers to read.  (See below.)
 
+   --download-method=<method>
+                   Choose this download method. Can be used in conjunction
+                   with the socks-port option. Supported methods are:
+                     - direct: downloads the file directly
+                     - bittorrent: use bittorrent for downloading
+
 
 THE CONTROLLER LOG FORMAT:
 

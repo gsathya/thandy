@@ -634,6 +634,53 @@ class ThandyDownloadJob(DownloadJob):
     def getMirror(self):
         return self._usingMirror
 
+class ThandyBittorrentDownloadJob(DownloadJob):
+    """Thandy's subtype of DownloadJob with BitTorrent support. Makes sure the
+       file downloaded via BitTorrent is the file we wanted, and moves
+       it into the right place.
+    """
+    def __init__(self, metaFile, relPath, destPath, wantHash=None,
+                 supportedURLTypes=None, useTor=None, repoFile=None,
+                 downloadStatusLog=None, wantLength=None):
+
+        DownloadJob.__init__(self, destPath, None, wantHash=wantHash,
+                             wantLength=wantLength,
+                             useTor=useTor, repoFile=repoFile)
+        self._relPath = relPath
+        self._metaFile = metaFile
+
+        tmppath = thandy.util.userFilename("tmp")
+        if relPath.startswith("/"):
+            relPath = relPath[1:]
+        self._tmpPath = os.path.join(tmppath, relPath)
+
+        d = os.path.dirname(self._tmpPath)
+        if not os.path.exists(d):
+            os.makedirs(d, 0700)
+
+        self._downloadStatusLog = downloadStatusLog
+
+    def setDownloadStatusLog(self, log):
+        self._downloadStatusLog = log
+
+    def getRelativePath(self):
+        return self._relPath
+
+    def _download(self):
+
+        btcomp = thandy.bt_compat.BtCompat()
+        btcomp.download(self._metaFile, self._tmpPath)
+
+        try:
+            self._checkTmpFile()
+        except (thandy.FormatException, thandy.DownloadError), err:
+            self._removeTmpFile()
+            if haveStalled:
+                raise BadCompoundData(err)
+            else:
+                raise
+        thandy.util.ensureParentDir(self._destPath)
+        thandy.util.moveFile(self._tmpPath, self._destPath)
 
 _socks_opener = thandy.socksurls.build_socks_opener()
 
