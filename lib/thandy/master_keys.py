@@ -18,5 +18,5 @@ DEFAULT_MIRRORLIST = {
              ],
 }
 
-DEFAULT_TRACKER = NONE
+DEFAULT_TRACKER = None
 
