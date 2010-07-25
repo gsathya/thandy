@@ -1,13 +1,18 @@
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
+"""This file defines an object oriented pattern matching system used to
+   check decoded xJSON objects.
+"""
+
 import re
 import sys
 
 import thandy
 
 class Schema:
-    """A schema matches a set of possible Python objects, of types
-       that are encodable in JSON."""
+    """A Schema matches a set of possible Python objects, of types
+       that are encodable in JSON.  This is an abstract base type;
+       see implementations below."""
     def matches(self, obj):
         """Return True if 'obj' matches this schema, False if it doesn't."""
         try:
@@ -73,7 +78,7 @@ class RE(Schema):
 
 class Str(Schema):
     """
-       Matches a particular string.
+       Matches a particular string, and no other.
 
        >>> s = Str("Hi")
        >>> s.matches("Hi")
@@ -113,7 +118,7 @@ class AnyStr(Schema):
 
 class OneOf(Schema):
     """
-       Matches an object that matches any one of several schemas.
+       Matches an object that matches any one of several sub-schemas.
 
        >>> s = OneOf([ListOf(Int()), Str("Hello"), Str("bye")])
        >>> s.matches(3)
@@ -139,11 +144,19 @@ class OneOf(Schema):
 
 class AllOf(Schema):
     """Matches the intersection of a list of schemas.
+
+       >>> s = AllOf([RE(r'.*end'), RE(r'begin.*')])
+       >>> s.matches("an end")
+       False
+       >>> s.matches("begin well")
+       False
+       >>> s.matches("begin and end")
+       True
     """
     def __init__(self, required):
         self._subschemas = required[:]
 
-    def checkMatche(self, obj):
+    def checkMatch(self, obj):
         for s in self._subschemas:
             s.checkMatch(obj)
 
@@ -174,6 +187,10 @@ class ListOf(Schema):
        False
     """
     def __init__(self, schema, minCount=0, maxCount=sys.maxint,listName="list"):
+        """Create a new ListOf schema to match anywhere from minCount to
+           maxCount objects conforming to 'schema'.  When generating errors,
+           we will call this type 'listName'.
+        """
         self._schema = schema
         self._minCount = minCount
         self._maxCount = maxCount
@@ -240,6 +257,13 @@ class Struct(Schema):
     """
     def __init__(self, subschemas, optschemas=[], allowMore=False,
                  structName="list"):
+        """Create a new Struct schema to match lists that begin with
+           each item in 'subschemas' in order.  If there are more elements
+           than items in subschemas, additional elements much match
+           the items in optschemas (if any).  If there are more elements
+           than items in subschemas and optschemas put together, then
+           the object is only matched when allowMore is true.
+        """
         self._subschemas = subschemas + optschemas
         self._min = len(subschemas)
         self._allowMore = allowMore
@@ -276,6 +300,8 @@ class DictOf(Schema):
        False
     """
     def __init__(self, keySchema, valSchema):
+        """Return a new DictSchema to match objects all of whose keys match
+           keySchema, and all of whose values match valSchema."""
         self._keySchema = keySchema
         self._valSchema = valSchema
     def checkMatch(self, obj):
@@ -306,8 +332,9 @@ class Opt:
 
 class Obj(Schema):
     """
-       Matches a dict from specified keys to key-specific types.  Unrecognized
-       keys are allowed.
+       Matches a dict from specified keys to key-specific types.  All
+       keys are requied unless explicitly marked with Opt.
+       Unrecognized keys are always allowed.
 
        >>> s = Obj(a=AnyStr(), bc=Struct([Int(), Int()]))
        >>> s.matches({'a':"ZYYY", 'bc':[5,9]})
@@ -323,7 +350,6 @@ class Obj(Schema):
     def __init__(self, _objname="object", **d):
         self._objname = _objname
         self._required = d.items()
-
 
     def checkMatch(self, obj):
         if not isinstance(obj, dict):
@@ -372,6 +398,7 @@ class TaggedObj(Schema):
     """
     def __init__(self, tagName, tagIsOptional=False, ignoreUnrecognized=True,
                  **tagvals):
+        #DOCDOC
         self._tagName = tagName
         self._tagOpt = tagIsOptional
         self._ignoreOthers = ignoreUnrecognized
@@ -421,17 +448,26 @@ class Int(Schema):
        >>> Int(lo=10, hi=30).matches(5)
        False
     """
-    def __init__(self, lo=-sys.maxint, hi=sys.maxint):
+    def __init__(self, lo=None, hi=None):
+        """Return a new Int schema to match items between lo and hi inclusive.
+        """
+        if lo is not None and hi is not None:
+            assert lo <= hi
         self._lo = lo
         self._hi = hi
+        plo,phi=lo,hi
+        if plo is None: plo = "..."
+        if phi is None: phi = "..."
+        self._range = "[%s,%s]"%(plo,phi)
     def checkMatch(self, obj):
         if isinstance(obj, bool) or not isinstance(obj, (int, long)):
             # We need to check for bool as a special case, since bool
             # is for historical reasons a subtype of int.
             raise thandy.FormatException("Got %r instead of an integer"%obj)
-        elif not (self._lo <= obj <= self._hi):
-            raise thandy.FormatException("%r not in range [%r,%r]"
-                                         %(obj, self._lo, self._hi))
+        elif (self._lo is not None and self._lo > obj) or (
+            self._hi is not None and self._hi < obj):
+            raise thandy.FormatException("%r not in range %s"
+                                         %(obj, self._range))
 
 class Bool(Schema):
     """
@@ -450,7 +486,20 @@ class Bool(Schema):
             raise thandy.FormatException("Got %r instead of a boolean"%obj)
 
 class Func(Schema):
+    """
+       Matches an object based on the value of some boolen function
+
+       >>> even = lambda x: (x%2)==0
+       >>> s = Func(even, baseSchema=Int())
+       >>> s.matches(99)
+       False
+       >>> s.matches(98)
+       True
+       >>> s.matches("ninety-eight")
+       False
+    """
     def __init__(self, fn, baseSchema=None):
+        #DOCDOC
         self._fn = fn
         self._base = baseSchema
     def checkMatch(self, obj):

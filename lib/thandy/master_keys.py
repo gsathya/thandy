@@ -1,5 +1,9 @@
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
+""" This file is where a master keylist (and a default initial mirror list)
+    can currently ship with the Thandy code.
+"""
+
 MASTER_KEYS = [
     {
         "_keytype": "rsa",

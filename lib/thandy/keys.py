@@ -1,6 +1,12 @@
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
-# These require PyCrypto.
+"""thandy.keys --
+
+   This module defines functionality for public keys, and for a simple
+   encrypted keystore.
+"""
+
+# These imports require PyCrypto.
 import Crypto.PublicKey.RSA
 import Crypto.Hash.SHA256
 import Crypto.Cipher.AES
@@ -18,28 +24,46 @@ import thandy.util
 json = thandy.util.importJSON()
 
 class PublicKey:
-    """Abstract base class for public keys."""
+    """An abstract base class for public keys.  A public key object
+       always implements some kind of public key, and may also contain
+       the corresponding private key data."""
+    ## Fields:
+    # _roles: a list of (rolename, path) tuples that indicates which
+    #     roles we consider this public key to have.
     def __init__(self):
+        """Constructor: Initialize a public key."""
         self._roles = []
     def format(self):
+        """Return this public key converted into a JSon object"""
         raise NotImplemented()
     def sign(self, obj=None, digest=None):
         """Sign either a JSon object provided in 'obj', or a digest provided
            in 'digest'.  Return a list of (method name, base64-encoded
-           signature) tuple.
+           signature) tuples.
 
            Requires that this is a private key."""
         raise NotImplemented()
-    def checkSignature(self, method, data, signature):
+    def checkSignature(self, method, signature, obj=None, digest=None):
+        """Check the base64-encoded signature in 'signature', which was
+           generating using the method with the name 'method', to see
+           if it is a correct signature made with this key for either
+           a JSon object provided in 'obj' or a digest provided in 'digest'.
+
+           Returns True if the signature is value; False if it's invalid, and
+           UnknownMethod if we don't recognize 'method'.
+        """
         # returns True, False, or raises UnknownMethod.
         raise NotImplemented()
     def getKeyID(self):
+        """Return a base-64-encoded key ID for this key.  No two distinct
+           keys may share the same key ID.
+        """
         raise NotImplemented()
     def getRoles(self):
         """Return a list of all roles supported by this key.  A role is
            a doctype,pathPattern tuple.
         """
-        return self._roles
+        return self._roles[:]
     def addRole(self, role, path):
         """Add a role to the list of roles supported by this key.
            A role is a permission to sign a given kind of document
@@ -62,8 +86,14 @@ class PublicKey:
         return False
 
 if hex(1L).upper() == "0X1L":
+    # It looks like integers and longs aren't unified in this version
+    # of Python: converting a long to a hex string means there's a trailing
+    # 'L' we need to remove.
     def intToBinary(number):
         """Convert an int or long into a big-endian series of bytes.
+
+           >>> intToBinary(92807287956601L)
+           'Thandy'
         """
         # This "convert-to-hex, then use binascii" approach may look silly,
         # but it's over 10x faster than the Crypto.Util.number approach.
@@ -73,6 +103,8 @@ if hex(1L).upper() == "0X1L":
             h = "0"+h
         return binascii.a2b_hex(h)
 elif hex(1L).upper() == "0X1":
+    # It looks like integers and longs _are_ unified.  Maybe this is Python 3?
+    # In any case, we don't need to remove the trailing L.
     def intToBinary(number):
         "Variant for future versions of pythons that don't append 'L'."
         h = hex(long(number))
@@ -87,18 +119,31 @@ else:
 
 def binaryToInt(binary):
    """Convert a big-endian series of bytes into a long.
+
+      >>> binaryToInt('Hi')
+      18537L
    """
    return long(binascii.b2a_hex(binary), 16)
 
 def intToBase64(number):
-    """Convert an int or long to a big-endian base64-encoded value."""
+    """Convert an int or long to a big-endian base64-encoded value.
+
+        >>> intToBase64(0x4e16a777)
+        'Thandw'
+    """
     return thandy.formats.formatBase64(intToBinary(number))
 
 def base64ToInt(number):
-    """Convert a big-endian base64-encoded value to a long."""
+    """Convert a big-endian base64-encoded value to a long.
+
+        >>> base64ToInt('Thandy')
+        1310107511L
+    """
     return binaryToInt(thandy.formats.parseBase64(number))
 
 def _pkcs1_padding(m, size):
+    """Add PKCS padding to the message 'm', so that it's appropriate for
+       use with a public key of 'size' bytes."""
     # I'd rather use OAEP+, but apparently PyCrypto barely supports
     # signature verification, and doesn't seem to support signature
     # verification with nondeterministic padding.  "argh."
@@ -108,13 +153,16 @@ def _pkcs1_padding(m, size):
     return r
 
 def _xor(a,b):
-    if a:
-        return not b
-    else:
-        return b
+    """Return true iff exactly one of and b are true.  Used to check
+       some conditions."""
+    return bool(a) ^ bool(b)
 
 class RSAKey(PublicKey):
     """
+    An RSAKey is an implementation of the abstract class 'PublicKey' that
+    can sign documents and check signatures using RSA keys of arbitrary
+    size.
+
     >>> k = RSAKey.generate(bits=512)
     >>> obj = k.format()
     >>> obj['_keytype']
@@ -136,27 +184,33 @@ class RSAKey(PublicKey):
     >>> k.checkSignature(method, sig, obj=s2)
     False
     """
+    ## Fields: (beyond those inherited from PublicKey)
+    # key -- a PyCrypto RSA key, public or private.  See Crypto.PublicKey.RSA.
+    # keyid -- the base64 key ID for this key, or 'None' if we haven't
+    #   generated one yet.
     def __init__(self, key):
+        """Constructure: Initialize a new RSAKey from a PyCrypto RSA key."""
         PublicKey.__init__(self)
         self.key = key
         self.keyid = None
 
     @staticmethod
     def generate(bits=2048):
-        """Generate a new RSA key, with modulus length 'bits'."""
+        """Generate and return a new RSA key, with modulus length 'bits'."""
         key = Crypto.PublicKey.RSA.generate(bits=bits, randfunc=os.urandom)
         return RSAKey(key)
 
     @staticmethod
     def fromJSon(obj):
-        """Construct an RSA key from the output of the format() method.
+        """Construct and return a RSAKey from the JSon object output of the
+           RSAKey.format() method.  May raise thandy.FormatException.
         """
         # obj must match RSAKEY_SCHEMA
 
         thandy.formats.RSAKEY_SCHEMA.checkMatch(obj)
         n = base64ToInt(obj['n'])
         e = base64ToInt(obj['e'])
-        if obj.has_key('d'):
+        if thandy.formats.RSAKEY_PRIVATE_SCHEMA.matches(obj):
             d = base64ToInt(obj['d'])
             p = base64ToInt(obj['p'])
             q = base64ToInt(obj['q'])
@@ -173,11 +227,11 @@ class RSAKey(PublicKey):
         return result
 
     def isPrivateKey(self):
-        """Return true iff this key has private-key components"""
+        """Return True iff this key has private-key components"""
         return hasattr(self.key, 'd')
 
     def format(self, private=False, includeRoles=False):
-        """Return a new object to represent this key in json format.
+        """Return a new json object to represent this key in json format.
            If 'private', include private-key data.  If 'includeRoles',
            include role information.
         """
@@ -205,6 +259,7 @@ class RSAKey(PublicKey):
         return self.keyid
 
     def sign(self, obj=None, digest=None):
+        # See PublicKey.sign for documentation
         assert _xor(obj == None, digest == None)
         method = "sha256-pkcs1"
         if digest == None:
@@ -214,6 +269,7 @@ class RSAKey(PublicKey):
         return [ (method, sig) ]
 
     def checkSignature(self, method, sig, obj=None, digest=None):
+        # See PublicKey.checkSignature for documentation
         assert _xor(obj == None, digest == None)
         if method != "sha256-pkcs1":
             raise thandy.UnknownMethod(method)
@@ -223,6 +279,7 @@ class RSAKey(PublicKey):
         m = _pkcs1_padding(digest, (self.key.size()+1) // 8)
         return bool(self.key.verify(m, (sig,)))
 
+# Length of salt to pass to secretToKey
 SALTLEN=16
 
 def secretToKey(salt, secret):
@@ -233,14 +290,15 @@ def secretToKey(salt, secret):
 
        (The goal is to make offline password-guessing attacks harder by
        increasing the time required to convert a password to a key, and to
-       make precomputed password tables impossible to generate by )
+       make precomputed password tables impossible to generate by using
+       a really huge salt.)
     """
     assert len(salt) == SALTLEN+1
 
     # The algorithm is basically, 'call the last byte of the salt the
     # "difficulty", and all other bytes of the salt S.  Now make
     # an infinite stream of S|secret|S|secret|..., and hash the
-    # first N bytes of that, where N is determined by the difficulty.
+    # first N bytes of that, where N is determined by the difficulty.'
     #
     # Obviously, this wants a hash algorithm that's tricky to
     # parallelize.
@@ -270,8 +328,10 @@ def secretToKey(salt, secret):
     return d.digest()
 
 def encryptSecret(secret, password, difficulty=0x80):
-    """Encrypt the secret 'secret' using the password 'password',
-       and return the encrypted result."""
+    """Encrypt the secret 'secret' using the password 'password', and
+       return the encrypted result.  The 'difficulty' parameter is a
+       one-byte value determining how hard to make the password-to-key
+       derivation"""
     # The encrypted format is:
     #    "GKEY1"  -- 5 octets, fixed, denotes data format.
     #    SALT     -- 17 bytes, used to hash password
@@ -354,25 +414,44 @@ def decryptSecret(encrypted, password):
     return secret
 
 class KeyStore(thandy.formats.KeyDB):
-    """Helper to store private keys in an encrypted file."""
+    """Helper class used to store private keys in a (usually) encrypted file.
+
+       It implements thandy.formats.KeyDB, so you can add keys to it
+       and get keys from it in a useful indexed way.
+    """
+    ## Fields:
+    # _loaded -- boolean: Have we loaded the keys from disk yet?
+    # _fname -- The filename that we use to store the keys.
+    # _passwd -- The password used to encrypt the keystore, or None if we
+    #    haven't asked for it yet.
+    # _encrypted -- boolean: Should we treat this as an encrypted keystore?
+    #
+    # File format:
+    #   A JSon object containing a single field, "keys", which in turn
+    #   contains a list of json-encoded keys.  This object is stored encrypted
+    #   with encryptSecret.
     def __init__(self, fname, encrypted=True):
         thandy.formats.KeyDB.__init__(self)
 
-        self._loaded = None
+        self._loaded = False
         self._fname = fname
         self._passwd = None
         self._encrypted = encrypted
 
     def getpass(self, reprompt=False):
+        """If we have already asked for the passphrase, return it.
+           If 'reprompt' is true, ask for the password twice,  to make sure
+           the user didn't mistype.  Otherwise, only ask once.
+        """
         if self._passwd != None:
             return self._passwd
         while 1:
-            sys.stderr.write("Password: ")
+            sys.stderr.write("Passphrase: ")
             pwd = getpass.getpass("")
             if not reprompt:
                 return pwd
 
-            sys.stderr.write("Confirm: ")
+            sys.stderr.write("   Confirm: ")
             pwd2 = getpass.getpass("")
             if pwd == pwd2:
                 return pwd
@@ -380,6 +459,10 @@ class KeyStore(thandy.formats.KeyDB):
                 print "Mismatch; try again."
 
     def load(self, password=None):
+        """Load the keyring into memory, decrypting as needed.
+
+           May raise various exceptions on failure.
+        """
         logging.info("Loading private keys from %r...", self._fname)
         if not os.path.exists(self._fname):
             logging.info("...no such file.")
@@ -405,12 +488,17 @@ class KeyStore(thandy.formats.KeyDB):
         self._loaded = True
 
     def setPassword(self, passwd):
+        """Set the cached password to 'passwd'."""
         self._passwd = passwd
 
     def clearPassword(self):
+        """Clear the cached password."""
         self._passwd = None
 
     def save(self, password=None):
+        """Save the keyring to disk.  Note that you must call this method,
+           or changes will not be persistent.
+        """
         if not self._loaded and self._encrypted:
             self.load(password)
 

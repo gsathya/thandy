@@ -19,6 +19,11 @@ import thandy.master_keys
 _jsonModule = None
 
 def importJSON():
+    """Load and return the json module.
+
+       When everybody has Python 2.6 or later, we can just replace this with
+       'import json; return json'
+    """
     global _jsonModule
     if _jsonModule is not None:
         return _jsonModule
@@ -200,6 +205,7 @@ def getRegistryValue(keyname):
 _controlLog = logging.getLogger("thandy-ctrl")
 
 def formatLogString(s):
+    """DOCDOC"""
     s = '"%s"' % re.sub(r'(["\\])', r'\\\1', s)
     s = s.replace("\n", "\\n")
     return s

@@ -68,6 +68,7 @@ class CryptoTests(unittest.TestCase):
         ks = thandy.keys.KeyStore(fname)
         key1 = thandy.keys.RSAKey.generate(512)
         key2 = thandy.keys.RSAKey.generate(512)
+        key1.addRole('master', '**')
         ks.addKey(key1)
         ks.addKey(key2)
         ks.save(passwd)
@@ -75,6 +76,7 @@ class CryptoTests(unittest.TestCase):
         ks2 = thandy.keys.KeyStore(fname)
         ks2.load(passwd)
         self.assertEquals(key1.key.n, ks2.getKey(key1.getKeyID()).key.n)
+        self.assertEquals(key1.getRoles(), [("master", "**")])
 
 class UtilTests(unittest.TestCase):
     def setUp(self):

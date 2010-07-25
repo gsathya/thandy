@@ -15,6 +15,9 @@ def tstamp():
     return time.strftime("%Y%m%d_%H%M%S", time.localtime())
 
 def snarf(fname):
+    """Return a string containing the binary contents of the file named
+       "fname."
+    """
     f = open(fname, 'rb')
     try:
         return f.read()
@@ -22,6 +25,9 @@ def snarf(fname):
         f.close()
 
 def snarfObj(fname):
+    """Return a 2-tuple of (object, len), where the object stored in json
+       format in the file 'fname', and len is that file's length.
+    """
     f = open(fname, 'r')
     try:
         length = os.fstat(f.fileno()).st_size

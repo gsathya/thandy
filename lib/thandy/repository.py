@@ -52,10 +52,13 @@ class RepositoryFile:
         self._mtime = None
 
     def clear(self):
-        """DOCDOC"""
+        """Clear all cached fields loaded from disk; the next time we need one,
+           we'll reload the file entirely.
+        """
         self._main_obj = self._signed_obj = None
         self._sigStatus = None
         self._mtime = None
+        self._length = None
 
     def getRelativePath(self):
         """Return the filename for this item relative to the top of the
@@ -118,6 +121,7 @@ class RepositoryFile:
         return signed_obj, main_obj
 
     def checkFile(self, fname, needhash=None):
+        """DOCDOC"""
         f = open(fname, 'r')
         try:
             s = f.read()
@@ -167,7 +171,9 @@ class RepositoryFile:
         return self._sigStatus
 
 class PkgFile:
+    """DOCDOC"""
     def __init__(self, repository, relativePath, needHash):
+        """DOCDOC"""
         self._repository = repository
         self._relativePath = relativePath
         self._needHash = needHash
@@ -175,22 +181,28 @@ class PkgFile:
         self._mtime = None
 
     def clear(self):
+        """DOCDOC"""
         self._mtime = None
 
     def load(self):
+        """DOCDOC"""
         pass
 
     def getRelativePath(self):
+        """DOCDOC"""
         return self._relativePath
 
     def getPath(self):
+        """DOCDOC"""
         fname = self._repository.getFilename(self._relativePath)
         return os.path.normpath(fname)
 
     def getExpectedHash(self):
+        """DOCDOC"""
         return self._needHash
 
     def checkFile(self, fname, needHash=None):
+        """DOCDOC"""
         if needHash:
             if thandy.formats.getFileDigest(fname) != needHash:
                 raise thandy.FormatException("Digest for %s not as expected.")

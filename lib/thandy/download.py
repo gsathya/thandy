@@ -31,7 +31,7 @@ class DownloadManager:
         # Work queue of DownloadJobs that we intend to process once a thread
         # is free.
         self.downloadQueue = Queue.Queue()
-        # DOCDOC
+        # Work queue of functions that need to be run in the main thread.
         self.resultQueue = Queue.Queue()
 
         # List of worker threads.
@@ -43,10 +43,10 @@ class DownloadManager:
         for t in self.threads:
             t.setDaemon(True)
 
-        # DOCDOC
+        # Used to remember the status of downloads to avoid too much retrying
         self.statusLog = DownloadStatusLog()
 
-        #DOCDOC
+        # Used to tell the main thread to raise an exception.
         self._raiseMe = None
 
     def start(self):
@@ -85,13 +85,17 @@ class DownloadManager:
     def wait(self):
         """Pause until we have no active or pending jobs."""
         while not self.finished():
+            # Wait till somebody tells us to do something.
             self.done.acquire()
             self.done.wait()
             self.done.release()
 
+            # Did something go wrong?
             if self._raiseMe:
                 raise self._raiseMe
 
+            # Suck functions out of resultQueue and run them until
+            # resultQueue is empty.
             try:
                 while True:
                     item = self.resultQueue.get(block=False)
@@ -130,7 +134,7 @@ class DownloadManager:
     def _thread(self, idx):
         # Run in the background per thread.  idx is the number of the thread.
         while True:
-            job = self.downloadQueue.get() # Grab job from queue.
+            job = self.downloadQueue.get() # Grab a job from queue.
             rp = job.getRelativePath()
             success = False
             try:
@@ -214,7 +218,6 @@ _STATUS_LOG_SCHEMA = S.Obj(
     mirrorFailures=S.DictOf(S.AnyStr(), _FAIL_SCHEMA),
     networkFailures=_FAIL_SCHEMA)
 del S
-
 
 class DownloadStatusLog:
     """Tracks when we can retry downloading from various mirrors.
@@ -708,7 +711,8 @@ def getConnection(url, useTor, have_length=None):
 
 
 if __name__ == '__main__':
-    # Trivial CLI to test out downloading.
+    # Trivial CLI to test out downloading: fetches files with urrlib2
+    # as specified on the command line.  Launches them all in parallel.
 
     import getopt
     options, args = getopt.getopt(sys.argv[1:], "",

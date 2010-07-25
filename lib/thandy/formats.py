@@ -15,9 +15,16 @@ import Crypto.Hash.SHA256
 
 class KeyDB:
     """A KeyDB holds public keys, indexed by their key IDs."""
+    ## Fields:
+    #   _keys: a map from keyid to public key.
     def __init__(self):
+        """Create a new empty KeyDB."""
         self._keys = {}
     def addKey(self, k):
+        """Insert a thandy.keys.PublicKey object, 'k', into this KeyDB.  If
+           we already had this key, retain the old one, but add any roles in
+           the new key 'k'.
+        """
         keyid = k.getKeyID()
         try:
             oldkey = self._keys[keyid]
@@ -28,8 +35,12 @@ class KeyDB:
             pass
         self._keys[k.getKeyID()] = k
     def getKey(self, keyid):
+        """Return the key whose key ID is 'keyid'.  If there is no such key,
+           raise KeyError."""
         return self._keys[keyid]
     def getKeysByRole(self, role, path):
+        """Return a list of all keys that have the role 'role' set for files
+           in 'path'."""
         results = []
         for key in self._keys.itervalues():
             for r,p in key.getRoles():
@@ -39,14 +50,17 @@ class KeyDB:
         return results
 
     def getKeysFuzzy(self, keyid):
+        """Return a list of all keys whose key IDs begin with 'keyid'."""
         r = []
         for k,v in self._keys.iteritems():
             if k.startswith(keyid):
                 r.append(v)
         return r
     def iterkeys(self):
+        """Return a new iterator of all the keys in this KeyDB."""
         return self._keys.itervalues()
 
+# Internal cache that maps role paths to regex objects that parse them.
 _rolePathCache = {}
 def rolePathMatches(rolePath, path):
     """Return true iff the relative path in the filesystem 'path' conforms
@@ -109,7 +123,12 @@ class SignatureStatus:
 
 def checkSignatures(signed, keyDB, role=None, path=None):
     """Given an object conformant to SIGNED_SCHEMA and a set of public keys
-       in keyDB, verify the signed object in 'signed'."""
+       in keyDB, verify the signed object is signed.  If 'role' and 'path'
+       are provided, verify that the signing key has the correct role to
+       sign this document as stored in 'path'.
+
+       Returns a SignatureStatus.
+    """
 
     SIGNED_SCHEMA.checkMatch(signed)
 
@@ -156,7 +175,10 @@ def checkSignatures(signed, keyDB, role=None, path=None):
 
     return SignatureStatus(goodSigs, badSigs, unknownSigs, tangentialSigs)
 
-def canonical_str_encoder(s):
+def _canonical_str_encoder(s):
+    """Helper for encodeCanonical: encodes a string as the byte sequence
+       expected for canonical JSON format.
+    """
     s = '"%s"' % re.sub(r'(["\\])', r'\\\1', s)
     if isinstance(s, unicode):
         return s.encode("utf-8")
@@ -168,7 +190,7 @@ def _encodeCanonical(obj, outf):
     # even let us replace the separators.
 
     if isinstance(obj, basestring):
-        outf(canonical_str_encoder(obj))
+        outf(_canonical_str_encoder(obj))
     elif obj is True:
         outf("true")
     elif obj is False:
@@ -191,12 +213,12 @@ def _encodeCanonical(obj, outf):
             items = obj.items()
             items.sort()
             for k,v in items[:-1]:
-                outf(canonical_str_encoder(k))
+                outf(_canonical_str_encoder(k))
                 outf(":")
                 _encodeCanonical(v, outf)
                 outf(",")
             k, v = items[-1]
-            outf(canonical_str_encoder(k))
+            outf(_canonical_str_encoder(k))
             outf(":")
             _encodeCanonical(v, outf)
         outf("}")
@@ -206,11 +228,11 @@ def _encodeCanonical(obj, outf):
 def encodeCanonical(obj, outf=None):
     """Encode the object obj in canoncial JSon form, as specified at
        http://wiki.laptop.org/go/Canonical_JSON .  It's a restricted
-       dialect of json in which keys are always lexically sorted,
+       dialect of JSON in which keys are always lexically sorted,
        there is no whitespace, floats aren't allowed, and only quote
-       and backslash get escaped.  The result is encoded in UTF-8,
-       and the resulting bits are passed to outf (if provided), or joined
-       into a string and returned.
+       and backslash get escaped.  The result is encoded in UTF-8, and
+       the resulting bytes are passed to outf (if provided) in several
+       calls, or joined into a string and returned.
 
        >>> encodeCanonical("")
        '""'
@@ -222,6 +244,14 @@ def encodeCanonical(obj, outf=None):
        '{"A":[99]}'
        >>> encodeCanonical({"x" : 3, "y" : 2})
        '{"x":3,"y":2}'
+       >>> total = 0
+       >>> def increment(s):
+       ...   global total
+       ...   total += len(s)
+       ...
+       >>> encodeCanonical({"x" : 3, "y" : 2, 'z' : [99,3]}, outf=increment)
+       >>> total
+       24
     """
 
     result = None
@@ -236,10 +266,9 @@ def encodeCanonical(obj, outf=None):
 
 def getDigest(obj, digestObj=None):
     """Update 'digestObj' (typically a SHA256 object) with the digest of
-       the canonical json encoding of obj.  If digestObj is none,
-       compute the SHA256 hash and return it.
-
-       DOCDOC string equivalence.
+       obj, first encoding it in canonical form if it's a JSON object,
+       and taking its UTF-8 encoding if it's in unicode.  If digestObj
+       is none, just compute and return the SHA256 hash.
     """
     useTempDigestObj = (digestObj == None)
     if useTempDigestObj:
@@ -291,6 +320,9 @@ def getFileDigest(f, digestObj=None):
         return digestObj.digest()
 
 def makeSignable(obj):
+    """Return a new JSON object of type 'signed' wrapping 'obj', and containing
+       no signatures.
+    """
     return { 'signed' : obj, 'signatures' : [] }
 
 def sign(signed, key):
@@ -349,12 +381,22 @@ def parseBase64(s):
         raise thandy.FormatException("Invalid base64 encoding")
 
 def parseHash(s):
+    """Parse a base64-encoded digest.
+
+       (This is just like paseBase64, but it checks the size.)
+    """
     h = parseBase64(s)
     if len(h) != Crypto.Hash.SHA256.digest_size:
         raise thandy.FormatException("Bad hash length")
     return h
 
+# Abbreviate the thandy.checkJson module here, since we're going to be
+# using all of its members a lot here.
 S = thandy.checkJson
+
+#########
+## These schemas describe, in OO constraint-checking form, all the Thandy
+## data formats.
 
 # A date, in YYYY-MM-DD HH:MM:SS format.
 TIME_SCHEMA = S.RE(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}')
@@ -370,6 +412,15 @@ RSAKEY_SCHEMA = S.Obj(
     _keytype=S.Str("rsa"),
     e=BASE64_SCHEMA,
     n=BASE64_SCHEMA)
+# An RSA key with private-key informartion: subtype of RSAKEY_SCHEMA.
+RSAKEY_PRIVATE_SCHEMA = S.Obj(
+    _keytype=S.Str("rsa"),
+    e=BASE64_SCHEMA,
+    n=BASE64_SCHEMA,
+    d=BASE64_SCHEMA,
+    p=BASE64_SCHEMA,
+    q=BASE64_SCHEMA,
+    u=BASE64_SCHEMA)
 # Any public key.
 PUBKEY_SCHEMA = S.Obj(
     _keytype=S.AnyStr())
@@ -393,6 +444,7 @@ SIGNED_SCHEMA = S.Obj(
     signed=S.Any(),
     signatures=S.ListOf(SIGNATURE_SCHEMA))
 
+# The name of a role
 ROLENAME_SCHEMA = S.AnyStr()
 
 # A role: indicates that a key is allowed to certify a kind of
@@ -459,6 +511,7 @@ def checkWinRegistryKeyname(keyname):
     elif not key or not value:
         raise thandy.FormatException("Bad registry entry.")
 
+# A string holding the name of a windows registry key
 REGISTRY_KEY_SCHEMA = S.Func(checkWinRegistryKeyname)
 
 CHECK_ITEM_SCHEMA = S.TaggedObj(
@@ -516,6 +569,10 @@ PACKAGE_SCHEMA = S.Func(checkPackageFormatConsistency, PACKAGE_SCHEMA)
 ALL_ROLES = ('timestamp', 'mirrors', 'bundle', 'package', 'master')
 
 class Keylist(KeyDB):
+    """A list of keys, as extracted from a Thandy keys.txt JSon file.
+
+       This class extends KeyDB, so you can acces keys more easily.
+    """
     def __init__(self):
         KeyDB.__init__(self)
 
@@ -542,6 +599,16 @@ class Keylist(KeyDB):
             self.addKey(key)
 
 class StampedInfo:
+    """This class holds a single entry in a timestamp file.  Each
+       StampedInfo says when a file was last modified, and what its
+       hash was.  It may also provide useful info about where to find it,
+       its version, its length, and so on.
+    """
+    ## _ts -- the time when the file was last modified
+    ## _hash -- the hash of the most recent version of the file
+    ## _version -- version of the most recent file. May be None
+    ## _relpath -- where to find this file in the repository
+    ## _length -- the length of the file
     def __init__(self, ts, hash, version=None, relpath=None, length=None):
         self._ts = ts
         self._hash = hash
@@ -565,6 +632,11 @@ class StampedInfo:
         return self._length
 
 class TimestampFile:
+    """This class holds all the fields parsed from a thandy timestamp file."""
+    ## _time -- the time when this file was generated
+    ## _mirrorListInfo -- a StampedInfo for the keylist.
+    ## _keyListInfo -- a StampedInfo for the mirrorlist
+    ## _bundleInfo -- map from bundle name to StampedInfo
     def __init__(self, at, mirrorlistinfo, keylistinfo, bundleinfo):
         self._time = at
         self._mirrorListInfo = mirrorlistinfo
@@ -575,6 +647,9 @@ class TimestampFile:
     def fromJSon(obj):
         # must be validated.
         at = parseTime(obj['at'])
+        # We slice these lists because we want to support old thandys
+        # that didn't include the length on these, and new ones that
+        # might include more fields
         m = StampedInfo.fromJSonFields(*obj['m'][:3])
         k = StampedInfo.fromJSonFields(*obj['k'][:3])
         b = {}
@@ -606,6 +681,13 @@ class TimestampFile:
         return self._bundleInfo
 
 def readConfigFile(fname, needKeys=(), optKeys=(), preload={}):
+    """Read a configuration file from 'fname'.  A configuration file is a
+       python script that runs in a temporary namespace prepopulated
+       with the contents of 'reload'.  It is a thandy.FormatException
+       if the file finishes executation without setting every variable
+       listed in 'needKeys'.  These settings, plus any variables whose names
+       are listed in 'optKeys', are returned in a new dict.
+    """
     parsed = preload.copy()
     result = {}
     execfile(fname, parsed)
@@ -625,6 +707,10 @@ def readConfigFile(fname, needKeys=(), optKeys=(), preload={}):
     return result
 
 def makePackageObj(config_fname, package_fname):
+    """Given a description of a thandy package in config_fname, and the
+       name of the one file (only one is supported now!) in package_fname,
+       return a new unsigned package object.
+    """
     preload = {}
     shortDescs = {}
     longDescs = {}
@@ -702,6 +788,12 @@ def makePackageObj(config_fname, package_fname):
     return result
 
 def makeBundleObj(config_fname, getPackage, getPackageLength):
+    """Given a description of a thandy  bundle in config_fname,
+       return a new unsigned bundle object.  getPackage must be a function
+       returning a package object for every package the bundle requires
+       when given the package's name as input.  getPacakgeLength
+       must be a function returning the length of the package file.
+    """
     packages = []
     def ShortGloss(lang, val): packages[-1]['gloss'][lang] = val
     def LongGloss(lang, val): packages[-1]['longgloss'][lang] = val
@@ -749,20 +841,39 @@ def makeBundleObj(config_fname, getPackage, getPackageLength):
     return result
 
 def versionIsNewer(v1, v2):
+    """Return true if version v1 is newer than v2.  Both versions are
+       given as lists of version components.
+       >>> versionIsNewer([1,2,3], [1,2,3,4])
+       False
+       >>> versionIsNewer([1,2,3,5], [1,2,3,4])
+       True
+       >>> versionIsNewer([1,3,3,5], [1,2,3,5])
+       True
+    """
     return v1 > v2
 
 def getBundleKey(bundlePath):
     """
+       Return all parts of a bundle's "key" as used in a timestamp file,
+       given its full filename.
+
        >>> getBundleKey("/bundleinfo/tor-browser/win32/some-file-name.txt")
        '/bundleinfo/tor-browser/win32/'
     """
-    # No, we can't use "os.path.directory."  That isn't os-independent.
+    # No, we can't use "os.path.directory" or "os.path.split".  Those are
+    # OD-dependent, and all of our paths are in Unix format.
     idx = bundlePath.rindex("/")
     return bundlePath[:idx+1]
 
 def makeTimestampObj(mirrorlist_obj, mirrorlist_len,
                      keylist_obj, keylist_len,
                      bundle_objs):
+    """Return a new unsigned timestamp object for a given set of inputs,
+       where mirrorlist_obj and mirrorlist_len are a (signed, unencoded)
+       mirror list, and its length on disk; keylist_obj and keylist_len
+       are the same for the key list, and bundle_objs is a list of
+       (object, length) tuples for all the bundles.
+    """
     result = { '_type' : 'Timestamp',
                'at' : formatTime(time.time()) }
     result['m'] = [ mirrorlist_obj['ts'],
@@ -784,6 +895,8 @@ def makeTimestampObj(mirrorlist_obj, mirrorlist_len,
     return result
 
 class MirrorInfo:
+    """A MirrorInfo holds the parsed value of a thandy mirror list's entry
+       for a single mirror."""
     def __init__(self, name, urlbase, contents, weight):
         self._name = name
         self._urlbase = urlbase
@@ -809,6 +922,9 @@ class MirrorInfo:
                  'weight' : self._weight }
 
 def makeMirrorListObj(mirror_fname):
+    """Return a new unsigned mirrorlist object for the mirrors described in
+       'mirror_fname'.
+    """
     mirrors = []
     def Mirror(*a, **kw): mirrors.append(MirrorInfo(*a, **kw))
     preload = {'Mirror' : Mirror}
@@ -821,6 +937,9 @@ def makeMirrorListObj(mirror_fname):
     return result
 
 def makeKeylistObj(keylist_fname, includePrivate=False):
+    """Return a new unsigned keylist object for the keys described in
+       'mirror_fname'.
+    """
     keys = []
     def Key(obj): keys.append(obj)
     preload = {'Key': Key}
@@ -851,7 +970,11 @@ SCHEMAS_BY_TYPE = {
     }
 
 def checkSignedObj(obj, keydb=None):
-    # Returns signaturestatus, role, path on sucess.
+    """Given a signed object, check whether it is well-formed and correctly
+       signed with some key in keydb having the appropriate role.  On
+       success, returns a SignatureStatus, the rule used to sign it,
+       and the object's path in the repository.
+    """
 
     SIGNED_SCHEMA.checkMatch(obj)
     try:

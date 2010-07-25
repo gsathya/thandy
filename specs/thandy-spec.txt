@@ -216,7 +216,6 @@
     /meta/keys.txt
 
          Signed by the root keys; indicates keys and roles.
-         [???? I'm using the txt extension here.  Is that smart?]
 
     /meta/mirrors.txt
 

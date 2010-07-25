@@ -1,5 +1,12 @@
 # Copyright 2008 The Tor Project, Inc.  See LICENSE for licensing information.
 
+"""This module converts JSon to XML.  It is allegedly for people who have
+   libraries that can read XML, but nothing that can read JSon.
+
+   Nick questions whether it's actually useful.  Certainly, it's quite
+   unlikely that you'll be able to check any keys once you've converted it.
+"""
+
 import re
 import thandy
 
