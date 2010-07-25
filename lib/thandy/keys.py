@@ -23,8 +23,12 @@ class PublicKey:
         self._roles = []
     def format(self):
         raise NotImplemented()
-    def sign(self, data=None, digest=None):
-        # returns a list of method,signature tuples.
+    def sign(self, obj=None, digest=None):
+        """Sign either a JSon object provided in 'obj', or a digest provided
+           in 'digest'.  Return a list of (method name, base64-encoded
+           signature) tuple.
+
+           Requires that this is a private key."""
         raise NotImplemented()
     def checkSignature(self, method, data, signature):
         # returns True, False, or raises UnknownMethod.
@@ -125,7 +129,7 @@ class RSAKey(PublicKey):
     >>> k.getKeyID() == k1.getKeyID()
     True
     >>> s = { 'A B C' : "D", "E" : [ "F", "g", 99] }
-    >>> method, sig = k.sign(obj=s)
+    >>> method, sig = k.sign(obj=s)[0]
     >>> k.checkSignature(method, sig, obj=s)
     True
     >>> s2 = [ s ]
@@ -207,7 +211,7 @@ class RSAKey(PublicKey):
             digest = thandy.formats.getDigest(obj)
         m = _pkcs1_padding(digest, (self.key.size()+1) // 8)
         sig = intToBase64(self.key.sign(m, "")[0])
-        return (method, sig)
+        return [ (method, sig) ]
 
     def checkSignature(self, method, sig, obj=None, digest=None):
         assert _xor(obj == None, digest == None)

@@ -295,7 +295,8 @@ def makeSignable(obj):
 
 def sign(signed, key):
     """Add an element to the signatures of 'signed', containing a new signature
-       of the "signed" part.
+       of the "signed" part using 'key'.  Replaces all previous signatures
+       generated with 'key'.
     """
 
     SIGNED_SCHEMA.checkMatch(signed)
@@ -306,11 +307,13 @@ def sign(signed, key):
     keyid = key.getKeyID()
 
     signatures = [ s for s in signatures if s['keyid'] != keyid ]
+    newsignatures = key.sign(signable)
 
-    method, sig = key.sign(signable)
-    signatures.append({ 'keyid' : keyid,
-                        'method' : method,
-                        'sig' : sig })
+    for method, sig in newsignatures:
+        signatures.append({ 'keyid' : keyid,
+                            'method' : method,
+                            'sig' : sig })
+
     signed['signatures'] = signatures
 
 def formatTime(t):
@@ -511,44 +514,6 @@ PACKAGE_SCHEMA = S.Obj(
 PACKAGE_SCHEMA = S.Func(checkPackageFormatConsistency, PACKAGE_SCHEMA)
 
 ALL_ROLES = ('timestamp', 'mirrors', 'bundle', 'package', 'master')
-
-class Key:
-    #XXXX UNUSED.
-    def __init__(self, key, roles=()):
-        self.key = key
-        self.roles = []
-        for r,p in roles:
-            self.addRole(r,p)
-
-    def addRole(self, role, path):
-        assert role in ALL_ROLES
-        self.roles.append((role, path))
-
-    def getRoles(self):
-        return self.roles
-
-    @staticmethod
-    def fromJSon(obj):
-        # must match PUBKEY_SCHEMA
-        keytype = obj['_keytype']
-        if keytype == 'rsa':
-            return Key(thandy.keys.RSAKey.fromJSon(obj))
-        else:
-            return None
-
-    def format(self):
-        return self.key.format()
-
-    def getKeyID(self):
-        return self.key.getKeyID()
-
-    def sign(self, obj=None, digest=None):
-        return self.key.sign(obj, digest=digest)
-
-    def checkSignature(self, method, data, signature):
-        ok = self.key.checkSignature(method, data, signature)
-        # XXXX CACHE HERE.
-        return ok
 
 class Keylist(KeyDB):
     def __init__(self):
