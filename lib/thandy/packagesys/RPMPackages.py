@@ -125,7 +125,7 @@ def checkRPMInstall(name, version, ts=None):
 
     return found and all_ok
 
-class RPMChacker(PS.Checker):
+class RPMChecker(PS.Checker):
     def __init__(self, rpmname, rpmversion):
         PS.Checker.__init__(self)
         self._name = rpmname
