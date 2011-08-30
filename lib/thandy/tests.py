@@ -55,7 +55,7 @@ class CryptoTests(unittest.TestCase):
         self.assertRaises(thandy.UnknownFormat, thandy.keys.decryptSecret,
                           "foobar", password)
 
-        s2 = u"The secret word is now unicode frobbish."
+        s2 = "The secret word is now unicode frobbish."
         encrypted = thandy.keys.encryptSecret(s2, password)
         self.assertNotEquals(encrypted, s2.encode("utf-8"))
         self.assert_(encrypted.startswith("GKEY1"))
@@ -66,8 +66,8 @@ class CryptoTests(unittest.TestCase):
         passwd = "umfitty noonah"
         fname = tempfile.mktemp()
         ks = thandy.keys.KeyStore(fname)
-        key1 = thandy.keys.RSAKey.generate(512)
-        key2 = thandy.keys.RSAKey.generate(512)
+        key1 = thandy.keys.RSAKey.generate(2048)
+        key2 = thandy.keys.RSAKey.generate(2048)
         key1.addRole('master', '**')
         ks.addKey(key1)
         ks.addKey(key2)

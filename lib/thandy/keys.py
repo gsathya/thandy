@@ -163,7 +163,7 @@ class RSAKey(PublicKey):
     can sign documents and check signatures using RSA keys of arbitrary
     size.
 
-    >>> k = RSAKey.generate(bits=512)
+    >>> k = RSAKey.generate(bits=2048)
     >>> obj = k.format()
     >>> obj['_keytype']
     'rsa'
